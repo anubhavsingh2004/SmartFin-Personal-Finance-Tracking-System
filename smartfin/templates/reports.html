@@ -1,0 +1,120 @@
+{% extends 'base.html' %}
+
+{% block title %}Reports | SmartFin{% endblock %}
+
+{% block content %}
+<section class="page-header">
+    <div>
+        <span class="eyebrow">Analytics report</span>
+        <h1>Financial reports and insights</h1>
+        <p>Review your current financial position, trend analysis, and top action points.</p>
+    </div>
+</section>
+
+<section class="stats-grid compact-grid">
+    <article class="stat-card">
+        <span>Income</span>
+        <strong>Rs. {{ '%.2f'|format(summary.total_income) }}</strong>
+    </article>
+    <article class="stat-card expense-card">
+        <span>Expenses</span>
+        <strong>Rs. {{ '%.2f'|format(summary.total_expenses) }}</strong>
+    </article>
+    <article class="stat-card balance-card">
+        <span>Savings Rate</span>
+        <strong>{{ '%.2f'|format(summary.savings_rate) }}%</strong>
+    </article>
+    <article class="stat-card prediction-card">
+        <span>Overspending Ratio</span>
+        <strong>{{ '%.2f'|format(overspending.ratio) }}%</strong>
+    </article>
+</section>
+
+<section class="dashboard-grid">
+    <article class="panel chart-panel">
+        <div class="panel-heading">
+            <h2>Category Breakdown</h2>
+            <p>Chart view of expenses grouped by category.</p>
+        </div>
+        <canvas id="expenseCategoryChart"></canvas>
+    </article>
+
+    <article class="panel chart-panel">
+        <div class="panel-heading">
+            <h2>Monthly Trend</h2>
+            <p>Track how monthly expenses are changing.</p>
+        </div>
+        <canvas id="monthlyTrendChart"></canvas>
+    </article>
+
+    <article class="panel chart-panel full-width-panel">
+        <div class="panel-heading">
+            <h2>Savings Snapshot</h2>
+            <p>Compare income, expenses, and savings month by month.</p>
+        </div>
+        <canvas id="savingsExpenseChart"></canvas>
+    </article>
+
+    <article class="panel">
+        <div class="panel-heading">
+            <h2>Suggestions</h2>
+            <p>Data-driven financial recommendations.</p>
+        </div>
+        <ul class="suggestion-list">
+            {% for suggestion in suggestions %}
+            <li>{{ suggestion }}</li>
+            {% endfor %}
+        </ul>
+    </article>
+
+    <article class="panel">
+        <div class="panel-heading">
+            <h2>Model Summary</h2>
+            <p>Explainable view of the classification, forecasting, and alert logic used in this project.</p>
+        </div>
+        <div class="note-grid">
+            {% for note in model_notes %}
+            <div class="note-card">
+                <strong>{{ note.title }}</strong>
+                <p>{{ note.detail }}</p>
+            </div>
+            {% endfor %}
+        </div>
+    </article>
+
+    <article class="panel">
+        <div class="panel-heading">
+            <h2>Latest Transactions</h2>
+            <p>Recent entries included in the report.</p>
+        </div>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Description</th>
+                        <th>Category</th>
+                        <th>Type</th>
+                        <th>Amount</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for transaction in transactions %}
+                    <tr>
+                        <td>{{ transaction.date }}</td>
+                        <td>{{ transaction.description }}</td>
+                        <td>{{ transaction.category }}</td>
+                        <td>{{ transaction.type }}</td>
+                        <td>Rs. {{ '%.2f'|format(transaction.amount) }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="5">No transactions available for reporting.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </article>
+</section>
+{% endblock %}

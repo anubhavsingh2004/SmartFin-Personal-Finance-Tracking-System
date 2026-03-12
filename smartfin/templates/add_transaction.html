@@ -1,0 +1,49 @@
+{% extends 'base.html' %}
+
+{% block title %}Add Transaction | SmartFin{% endblock %}
+
+{% block content %}
+<section class="page-header">
+    <div>
+        <span class="eyebrow">Transaction entry</span>
+        <h1>Add income or expense</h1>
+        <p>Descriptions for expenses are automatically categorized using the ML model.</p>
+    </div>
+</section>
+
+<section class="form-panel wide-form-panel">
+    <form method="POST" class="form-grid two-column-grid">
+        <label>
+            <span>Amount</span>
+            <input type="number" name="amount" step="0.01" min="0" required>
+        </label>
+        <label>
+            <span>Type</span>
+            <select name="type" id="transactionType" required>
+                <option value="Expense">Expense</option>
+                <option value="Income">Income</option>
+            </select>
+        </label>
+        <label>
+            <span>Category</span>
+            <input type="text" name="category" placeholder="Leave blank for auto category on expenses">
+        </label>
+        <label>
+            <span>Date</span>
+            <input type="date" name="date" required>
+        </label>
+        <label class="full-width-label">
+            <span>Description</span>
+            <textarea name="description" rows="4" placeholder="Example: lunch at cafe, electricity bill, freelance payment" required></textarea>
+        </label>
+        <div class="full-width-label inline-note">
+            {% if predicted_category %}
+            <p>Predicted category: <strong>{{ predicted_category }}</strong></p>
+            {% else %}
+            <p>Expense descriptions are analyzed by a Naive Bayes classifier trained on seed transaction data.</p>
+            {% endif %}
+        </div>
+        <button type="submit" class="primary-btn">Save Transaction</button>
+    </form>
+</section>
+{% endblock %}

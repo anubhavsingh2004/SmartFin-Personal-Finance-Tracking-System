@@ -1,0 +1,46 @@
+{% extends 'base.html' %}
+
+{% block title %}Login | SmartFin{% endblock %}
+
+{% block content %}
+<section class="auth-layout">
+    <div class="auth-copy">
+        <span class="eyebrow">AI-powered money assistant</span>
+        <h1>Track spending, predict expenses, and make better decisions.</h1>
+        <p>SmartFin combines Flask, SQLite, Pandas, and Scikit-learn to turn raw transactions into clear financial insights.</p>
+        <div class="auth-highlights">
+            <div class="highlight-card">
+                <strong>Expense categorization</strong>
+                <span>Naive Bayes predicts categories from descriptions.</span>
+            </div>
+            <div class="highlight-card">
+                <strong>Forecasting</strong>
+                <span>Linear Regression estimates the next month's expenses.</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="auth-card">
+        <h2>Login</h2>
+        <form method="POST" class="form-grid">
+            <label>
+                <span>Email</span>
+                <input type="email" name="email" placeholder="you@example.com" required>
+            </label>
+            <label>
+                <span>Password</span>
+                <input type="password" name="password" placeholder="Enter password" required>
+            </label>
+            <button type="submit" class="primary-btn">Sign In</button>
+        </form>
+        <div class="demo-card">
+            <strong>Demo Access</strong>
+            <p>Use the preloaded SmartFin account to open a dashboard with charts, suggestions, and predictions immediately.</p>
+            <p>Email: demo@smartfin.com</p>
+            <p>Password: Demo@123</p>
+            <a href="{{ url_for('demo_login') }}" class="secondary-btn">Enter Demo Dashboard</a>
+        </div>
+        <p class="auth-footnote">No account yet? <a href="{{ url_for('register') }}">Create one</a></p>
+    </div>
+</section>
+{% endblock %}

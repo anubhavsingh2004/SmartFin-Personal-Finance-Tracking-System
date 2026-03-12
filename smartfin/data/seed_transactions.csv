@@ -1,0 +1,29 @@
+description,category
+pizza dinner,Food
+grocery shopping,Food
+lunch at cafe,Food
+coffee and snacks,Food
+uber ride,Transport
+metro recharge,Transport
+fuel refill,Transport
+bus ticket,Transport
+movie tickets,Entertainment
+netflix subscription,Entertainment
+concert pass,Entertainment
+gaming recharge,Entertainment
+electricity bill,Bills
+water bill,Bills
+internet recharge,Bills
+mobile bill,Bills
+pharmacy medicine,Health
+doctor consultation,Health
+gym membership,Health
+vitamin supplements,Health
+mall shopping,Shopping
+online order shoes,Shopping
+clothing purchase,Shopping
+gift purchase,Shopping
+stationery purchase,Other
+book fair purchase,Other
+charity donation,Other
+misc household item,Other

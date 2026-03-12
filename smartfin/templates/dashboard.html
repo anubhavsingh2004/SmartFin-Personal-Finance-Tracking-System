@@ -1,0 +1,133 @@
+{% extends 'base.html' %}
+
+{% block title %}Dashboard | SmartFin{% endblock %}
+
+{% block content %}
+<section class="hero-panel">
+    <div>
+        <span class="eyebrow">Welcome back</span>
+        <h1>{{ user_name }}'s financial command center</h1>
+        <p>Monitor income, spending, savings, and AI-driven insights from one place.</p>
+    </div>
+    <a href="{{ url_for('add_transaction') }}" class="primary-btn">Add Transaction</a>
+</section>
+
+<section class="stats-grid">
+    <article class="stat-card">
+        <span>Total Income</span>
+        <strong>Rs. {{ '%.2f'|format(summary.total_income) }}</strong>
+    </article>
+    <article class="stat-card expense-card">
+        <span>Total Expenses</span>
+        <strong>Rs. {{ '%.2f'|format(summary.total_expenses) }}</strong>
+    </article>
+    <article class="stat-card balance-card">
+        <span>Remaining Balance</span>
+        <strong>Rs. {{ '%.2f'|format(summary.balance) }}</strong>
+    </article>
+    <article class="stat-card prediction-card">
+        <span>Predicted Next Month Expense</span>
+        <strong>Rs. {{ '%.2f'|format(prediction.predicted_expense) }}</strong>
+    </article>
+</section>
+
+{% if overspending.is_overspending %}
+<section class="alert-banner danger-banner">
+    <strong>Overspending Alert</strong>
+    <p>{{ overspending.message }} Current expense-to-income ratio: {{ '%.2f'|format(overspending.ratio) }}%</p>
+</section>
+{% else %}
+<section class="alert-banner success-banner">
+    <strong>Healthy Spending</strong>
+    <p>{{ overspending.message }}</p>
+</section>
+{% endif %}
+
+<section class="dashboard-grid">
+    <article class="panel chart-panel">
+        <div class="panel-heading">
+            <h2>Expense Category Distribution</h2>
+            <p>Doughnut chart of your spending categories.</p>
+        </div>
+        <canvas id="expenseCategoryChart"></canvas>
+    </article>
+
+    <article class="panel chart-panel">
+        <div class="panel-heading">
+            <h2>Monthly Spending Trend</h2>
+            <p>Line chart showing expense movement over time.</p>
+        </div>
+        <canvas id="monthlyTrendChart"></canvas>
+    </article>
+
+    <article class="panel chart-panel full-width-panel">
+        <div class="panel-heading">
+            <h2>Savings vs Expenses</h2>
+            <p>Bar chart comparing income, expenses, and savings by month.</p>
+        </div>
+        <canvas id="savingsExpenseChart"></canvas>
+    </article>
+
+    <article class="panel">
+        <div class="panel-heading">
+            <h2>AI Suggestions</h2>
+            <p>Dynamic recommendations from transaction analysis.</p>
+        </div>
+        <ul class="suggestion-list">
+            {% for suggestion in suggestions %}
+            <li>{{ suggestion }}</li>
+            {% endfor %}
+        </ul>
+    </article>
+
+    <article class="panel">
+        <div class="panel-heading">
+            <h2>Explainability Snapshot</h2>
+            <p>Short viva-ready notes describing how SmartFin produces results.</p>
+        </div>
+        <div class="note-grid">
+            {% for note in model_notes %}
+            <div class="note-card">
+                <strong>{{ note.title }}</strong>
+                <p>{{ note.detail }}</p>
+            </div>
+            {% endfor %}
+        </div>
+    </article>
+
+    <article class="panel">
+        <div class="panel-heading">
+            <h2>Recent Transactions</h2>
+            <p>Your latest income and expense entries.</p>
+        </div>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Description</th>
+                        <th>Category</th>
+                        <th>Type</th>
+                        <th>Amount</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for transaction in recent_transactions %}
+                    <tr>
+                        <td>{{ transaction.date }}</td>
+                        <td>{{ transaction.description }}</td>
+                        <td>{{ transaction.category }}</td>
+                        <td>{{ transaction.type }}</td>
+                        <td>Rs. {{ '%.2f'|format(transaction.amount) }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="5">No transactions yet. Add one to populate your dashboard.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </article>
+</section>
+{% endblock %}
