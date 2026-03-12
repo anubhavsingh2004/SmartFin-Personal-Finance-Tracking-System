@@ -39,7 +39,7 @@ SmartFin acts as an intelligent personal financial assistant with the following 
 ## Project Structure
 
 ```text
-smartfin/
+project-root/
 |-- app.py
 |-- requirements.txt
 |-- database.db
@@ -175,17 +175,11 @@ Chart data is fetched dynamically from the Flask endpoint `/api/chart_data`.
 PowerShell:
 
 ```powershell
-python -m venv venv
-.\venv\Scripts\Activate.ps1
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
 ```
 
-### 2. Move into the project folder
-
-```powershell
-cd smartfin
-```
-
-### 3. Install dependencies
+### 2. Install dependencies
 
 ```powershell
 pip install -r requirements.txt
@@ -193,7 +187,7 @@ pip install -r requirements.txt
 
 ## How to Run the Project
 
-From the `smartfin` folder:
+From the project root:
 
 ```powershell
 python app.py
@@ -253,3 +247,5 @@ This project is structured to be easy to explain during a viva:
 - Readable templates and styling
 - Straightforward rule-based financial suggestions
 - Explainable models suitable for academic presentation
+
+

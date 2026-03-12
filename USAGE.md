@@ -31,7 +31,7 @@ cd <project-folder>
 
 ## Step 2: Create the virtual environment
 
-Open a terminal inside the project root (the folder that contains the `smartfin/` folder) and run:
+Open a terminal inside the project root and run:
 
 **Windows PowerShell:**
 
@@ -53,10 +53,9 @@ After activation you will see `(.venv)` at the start of your terminal prompt. Al
 
 ## Step 3: Install dependencies
 
-Move into the `smartfin` folder and install the required packages:
+Install the required packages from the project root:
 
 ```
-cd smartfin
 pip install -r requirements.txt
 ```
 
@@ -66,7 +65,7 @@ This installs Flask, Pandas, NumPy, scikit-learn, joblib, and Matplotlib.
 
 ## Step 4: Run the application
 
-From inside the `smartfin` folder:
+From the project root:
 
 ```
 python app.py
@@ -242,7 +241,7 @@ Press `Ctrl + C` in the terminal where `python app.py` is running.
 ## Project structure for reference
 
 ```
-smartfin/
+project-root/
 ├── app.py                    Main Flask application
 ├── requirements.txt          Python dependencies
 ├── database.db               SQLite database (auto-created on first run)
@@ -271,7 +270,6 @@ smartfin/
 .\.venv\Scripts\Activate.ps1
 
 # Install dependencies
-cd smartfin
 pip install -r requirements.txt
 
 # Run the application
@@ -280,3 +278,7 @@ python app.py
 # Open in browser
 start http://localhost:5000
 ```
+
+
+
+

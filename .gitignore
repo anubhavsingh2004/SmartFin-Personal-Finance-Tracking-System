@@ -20,13 +20,13 @@ build/
 MANIFEST
 
 # ── SQLite database (contains user data) ─────────────────────────
-smartfin/database.db
+database.db
 *.db
 *.sqlite
 *.sqlite3
 
 # ── Trained ML model files ────────────────────────────────────────
-smartfin/models/*.joblib
+models/*.joblib
 *.joblib
 
 # ── Jupyter / IPython ────────────────────────────────────────────
@@ -62,3 +62,4 @@ logs/
 
 # ── Static file build output (if added later) ────────────────────
 node_modules/
+
