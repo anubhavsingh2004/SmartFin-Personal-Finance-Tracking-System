@@ -418,6 +418,10 @@ td {
     border-bottom: 1px solid rgba(22, 51, 59, 0.08);
 }
 
+tbody tr:hover {
+    background: rgba(12, 138, 158, 0.05);
+}
+
 th {
     color: var(--muted);
     font-size: 0.92rem;
@@ -435,6 +439,52 @@ th {
 .two-column-grid .primary-btn,
 .inline-note {
     grid-column: 1 / -1;
+}
+
+.form-actions-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.row-actions {
+    width: 120px;
+}
+
+.row-action-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px 12px;
+    border-radius: 10px;
+    border: 1px solid rgba(12, 138, 158, 0.24);
+    background: rgba(12, 138, 158, 0.1);
+    color: var(--primary-dark);
+    font-weight: 700;
+}
+
+.row-action-btn:hover {
+    background: rgba(12, 138, 158, 0.18);
+}
+
+.txn-type-chip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 5px 10px;
+    border-radius: 999px;
+    font-size: 0.82rem;
+    font-weight: 700;
+}
+
+.chip-income {
+    color: #0f6646;
+    background: rgba(30, 159, 112, 0.15);
+}
+
+.chip-expense {
+    color: #9f3131;
+    background: rgba(208, 84, 84, 0.15);
 }
 
 .inline-note {
@@ -489,5 +539,10 @@ canvas {
     .stat-card {
         padding: 22px;
         border-radius: 22px;
+    }
+
+    .form-actions-row {
+        flex-direction: column;
+        align-items: stretch;
     }
 }

@@ -1,0 +1,52 @@
+{% extends 'base.html' %}
+
+{% block title %}Edit Transaction | SmartFin{% endblock %}
+
+{% block content %}
+<section class="page-header">
+    <div>
+        <span class="eyebrow">Transaction correction</span>
+        <h1>Edit transaction details</h1>
+        <p>Fix type, category, amount, date, or description and keep reports accurate.</p>
+    </div>
+</section>
+
+<section class="form-panel wide-form-panel">
+    <form method="POST" class="form-grid two-column-grid">
+        <label>
+            <span>Amount</span>
+            <input type="number" name="amount" step="0.01" min="0" value="{{ transaction.amount }}" required>
+        </label>
+        <label>
+            <span>Type</span>
+            <select name="type" id="transactionType" required>
+                <option value="Expense" {% if transaction.type == 'Expense' %}selected{% endif %}>Expense</option>
+                <option value="Income" {% if transaction.type == 'Income' %}selected{% endif %}>Income</option>
+            </select>
+        </label>
+        <label>
+            <span>Category</span>
+            <input type="text" name="category" value="{{ transaction.category }}" placeholder="Leave blank for auto category on expenses">
+        </label>
+        <label>
+            <span>Date</span>
+            <input type="date" name="date" value="{{ transaction.date }}" required>
+        </label>
+        <label class="full-width-label">
+            <span>Description</span>
+            <textarea name="description" rows="4" placeholder="Example: lunch at cafe, electricity bill, freelance payment" required>{{ transaction.description }}</textarea>
+        </label>
+        <div class="full-width-label inline-note">
+            {% if predicted_category %}
+            <p>Suggested category based on description: <strong>{{ predicted_category }}</strong></p>
+            {% else %}
+            <p>For income entries, category defaults to Income if left empty.</p>
+            {% endif %}
+        </div>
+        <div class="full-width-label form-actions-row">
+            <button type="submit" class="primary-btn">Update Transaction</button>
+            <a href="{{ url_for('reports') }}" class="secondary-btn">Cancel</a>
+        </div>
+    </form>
+</section>
+{% endblock %}

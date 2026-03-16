@@ -109,6 +109,7 @@
                         <th>Category</th>
                         <th>Type</th>
                         <th>Amount</th>
+                        <th>Action</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -117,12 +118,19 @@
                         <td>{{ transaction.date }}</td>
                         <td>{{ transaction.description }}</td>
                         <td>{{ transaction.category }}</td>
-                        <td>{{ transaction.type }}</td>
+                        <td>
+                            <span class="txn-type-chip {% if transaction.type == 'Income' %}chip-income{% else %}chip-expense{% endif %}">
+                                {{ transaction.type }}
+                            </span>
+                        </td>
                         <td>Rs. {{ '%.2f'|format(transaction.amount) }}</td>
+                        <td class="row-actions">
+                            <a href="{{ url_for('edit_transaction', transaction_id=transaction.id) }}" class="row-action-btn">Edit</a>
+                        </td>
                     </tr>
                     {% else %}
                     <tr>
-                        <td colspan="5">No transactions yet. Add one to populate your dashboard.</td>
+                        <td colspan="6">No transactions yet. Add one to populate your dashboard.</td>
                     </tr>
                     {% endfor %}
                 </tbody>

@@ -52,6 +52,21 @@ def fetch_user_transactions(user_id: int) -> list[dict]:
     return [dict(row) for row in rows]
 
 
+def fetch_transaction_by_id(user_id: int, transaction_id: int) -> dict | None:
+    """Return one transaction for the current user or None when not found."""
+    connection = get_db_connection()
+    row = connection.execute(
+        """
+        SELECT id, user_id, amount, category, type, description, date
+        FROM transactions
+        WHERE id = ? AND user_id = ?
+        """,
+        (transaction_id, user_id),
+    ).fetchone()
+    connection.close()
+    return dict(row) if row else None
+
+
 def build_model_notes(prediction: dict, overspending: dict) -> list[dict]:
     """Return concise logic notes for demo and viva explanations."""
     prediction_status = prediction.get("status", "unknown")
@@ -244,6 +259,95 @@ def add_transaction():
         return redirect(url_for("dashboard"))
 
     return render_template("add_transaction.html", predicted_category=predicted_category)
+
+
+@app.route("/transaction/<int:transaction_id>/edit", methods=["GET", "POST"])
+@login_required
+def edit_transaction(transaction_id: int):
+    user_id = int(session["user_id"])
+    transaction = fetch_transaction_by_id(user_id, transaction_id)
+
+    if transaction is None:
+        flash("Transaction not found or you do not have permission to edit it.", "danger")
+        return redirect(url_for("reports"))
+
+    predicted_category = transaction["category"] if transaction["type"] == "Expense" else None
+
+    if request.method == "POST":
+        amount = request.form.get("amount", "0").strip()
+        category = request.form.get("category", "").strip()
+        transaction_type = request.form.get("type", "Expense").strip()
+        description = request.form.get("description", "").strip()
+        date_value = request.form.get("date", "").strip()
+
+        editable_transaction = dict(transaction)
+        editable_transaction.update(
+            {
+                "amount": amount,
+                "category": category,
+                "type": transaction_type,
+                "description": description,
+                "date": date_value,
+            }
+        )
+
+        try:
+            amount_value = float(amount)
+            if amount_value < 0:
+                raise ValueError
+        except ValueError:
+            flash("Amount must be a valid non-negative number.", "danger")
+            return render_template(
+                "edit_transaction.html",
+                transaction=editable_transaction,
+                predicted_category=predicted_category,
+            )
+
+        if not description or not date_value:
+            flash("Description and date are required.", "danger")
+            return render_template(
+                "edit_transaction.html",
+                transaction=editable_transaction,
+                predicted_category=predicted_category,
+            )
+
+        try:
+            datetime.strptime(date_value, "%Y-%m-%d")
+        except ValueError:
+            flash("Date must be in YYYY-MM-DD format.", "danger")
+            return render_template(
+                "edit_transaction.html",
+                transaction=editable_transaction,
+                predicted_category=predicted_category,
+            )
+
+        if transaction_type == "Expense":
+            predicted_category = expense_categorizer.predict_category(description)
+            category = category or predicted_category
+        else:
+            category = category or "Income"
+
+        previous_type = transaction["type"]
+
+        connection = get_db_connection()
+        connection.execute(
+            """
+            UPDATE transactions
+            SET amount = ?, category = ?, type = ?, description = ?, date = ?
+            WHERE id = ? AND user_id = ?
+            """,
+            (amount_value, category, transaction_type, description, date_value, transaction_id, user_id),
+        )
+        connection.commit()
+        connection.close()
+
+        if transaction_type == "Expense" or previous_type == "Expense":
+            expense_categorizer.retrain_with_latest_data()
+
+        flash("Transaction updated successfully.", "success")
+        return redirect(url_for("reports"))
+
+    return render_template("edit_transaction.html", transaction=transaction, predicted_category=predicted_category)
 
 
 @app.route("/reports")
