@@ -347,6 +347,11 @@ textarea {
     border-left: 6px solid var(--success);
 }
 
+.warning-banner {
+    border-left: 6px solid #d99428;
+    background: linear-gradient(160deg, rgba(217, 148, 40, 0.12), rgba(255, 255, 255, 0.82));
+}
+
 .dashboard-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -435,6 +440,12 @@ th {
     grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.budget-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+}
+
 .full-width-label,
 .two-column-grid .primary-btn,
 .inline-note {
@@ -514,6 +525,7 @@ canvas {
     .dashboard-grid,
     .auth-layout,
     .two-column-grid,
+    .budget-grid,
     .auth-highlights {
         grid-template-columns: 1fr;
     }

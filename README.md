@@ -10,6 +10,8 @@ SmartFin acts as an intelligent personal financial assistant with the following 
 - Categorize expense descriptions automatically using Naive Bayes classification
 - Analyze monthly and category-wise spending using Pandas
 - Detect overspending patterns with rule-based logic
+- Configure per-category monthly budgets from the UI
+- Receive threshold alerts at 85% and 100% budget usage
 - Predict future monthly expenses using Linear Regression
 - Provide data-driven financial suggestions
 - Display financial reports with Chart.js visualizations
@@ -114,8 +116,15 @@ SQLite stores users and transactions. Dates are stored in `YYYY-MM-DD` format to
 - Remaining balance card
 - Predicted next month expense card
 - Overspending alert section
+- Budget threshold notification section
 - AI financial suggestion section
 - Recent transactions table
+
+### Budget Management
+- New **Budgets** screen in the sidebar
+- Set custom monthly limits per category for each user
+- Limits are stored in SQLite in a dedicated table
+- Budget utilization notifications appear in dashboard/reports and as flash alerts after add/edit
 
 ### Add Transaction
 - Supports both income and expense entries
@@ -151,6 +160,12 @@ SQLite stores users and transactions. Dates are stored in `YYYY-MM-DD` format to
 
 #### Overspending Detection
 - If total expenses exceed 80% of income, SmartFin shows a warning alert
+
+#### Budget Threshold Alerts
+- Category budgets are user-configurable and persisted in SQLite
+- Alerts trigger at 85% usage (warning) and 100% usage (critical)
+- Each threshold event is deduplicated per month/category
+- Optional email notifications are sent on newly crossed thresholds
 
 #### AI-Based Suggestions
 Suggestions are generated dynamically from user data, for example:
@@ -231,12 +246,32 @@ This project demonstrates full-stack development and applied Machine Learning in
 
 ## Future Enhancements
 
-- Budget goal setting
 - CSV report export
-- Email overspending alerts
 - Dark mode toggle
 - Bank API integration
 - Recurring transaction automation
+
+## Email Alert Configuration
+
+Set the following environment variables to enable budget threshold emails:
+
+- `SMARTFIN_SMTP_HOST`
+- `SMARTFIN_SMTP_PORT` (default: `587`)
+- `SMARTFIN_SMTP_USERNAME`
+- `SMARTFIN_SMTP_PASSWORD`
+- `SMARTFIN_SMTP_USE_TLS` (`true` or `false`, default: `true`)
+- `SMARTFIN_EMAIL_FROM`
+
+Example PowerShell setup:
+
+```powershell
+$env:SMARTFIN_SMTP_HOST = "smtp.gmail.com"
+$env:SMARTFIN_SMTP_PORT = "587"
+$env:SMARTFIN_SMTP_USERNAME = "your-email@example.com"
+$env:SMARTFIN_SMTP_PASSWORD = "your-app-password"
+$env:SMARTFIN_SMTP_USE_TLS = "true"
+$env:SMARTFIN_EMAIL_FROM = "your-email@example.com"
+```
 
 ## Author Notes
 

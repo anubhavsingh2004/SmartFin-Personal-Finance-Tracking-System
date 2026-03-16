@@ -3,10 +3,15 @@
 from __future__ import annotations
 
 from collections import defaultdict
+from functools import lru_cache
 
 import pandas as pd
+from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.linear_model import LinearRegression
+from sklearn.naive_bayes import MultinomialNB
+from sklearn.pipeline import Pipeline
 
-from models.prediction_model import predict_next_month_expense
+from utils.database import create_budget_alert_event, fetch_user_category_budgets, get_db_connection
 
 
 def _build_frame(transactions: list[dict]) -> pd.DataFrame:
@@ -160,10 +165,17 @@ def generate_financial_suggestions(transactions: list[dict]) -> list[str]:
     return suggestions
 
 
-def build_chart_payload(transactions: list[dict]) -> dict:
+def build_chart_payload(transactions: list[dict], user_id: int | None = None) -> dict:
     patterns = analyze_spending_patterns(transactions)
     summary = calculate_summary(transactions)
-    prediction = predict_next_month_expense(transactions)
+    if user_id is not None:
+        prediction = predict_monthly_expense(user_id)
+    else:
+        # Fallback to transaction-only prediction when user_id is not available.
+        prediction = {
+            "predicted_expense": 0.0,
+            "status": "insufficient-data",
+        }
     frame = _build_frame(transactions)
 
     savings_by_month: dict[str, dict[str, float]] = defaultdict(lambda: {"income": 0.0, "expense": 0.0})
@@ -194,3 +206,278 @@ def build_chart_payload(transactions: list[dict]) -> dict:
         "monthly_spending": patterns["monthly_spending"],
         "savings_vs_expenses": savings_chart,
     }
+
+
+def _fetch_user_transactions_frame(user_id: int) -> pd.DataFrame:
+    """Load one user's transactions from SQLite into a clean Pandas DataFrame."""
+    connection = get_db_connection()
+    frame = pd.read_sql_query(
+        """
+        SELECT id, user_id, amount, category, type, description, date
+        FROM transactions
+        WHERE user_id = ?
+        """,
+        connection,
+        params=(user_id,),
+    )
+    connection.close()
+
+    if frame.empty:
+        return frame
+
+    frame["amount"] = pd.to_numeric(frame["amount"], errors="coerce").fillna(0.0)
+    frame["date"] = pd.to_datetime(frame["date"], format="%Y-%m-%d", errors="coerce")
+    return frame.dropna(subset=["date"])
+
+
+def check_overspending(user_id: int) -> list[str]:
+    """Return category alerts when current-month spend is >30% above last-6-month average."""
+    frame = _fetch_user_transactions_frame(user_id)
+    if frame.empty:
+        return []
+
+    expenses = frame[frame["type"] == "Expense"].copy()
+    if expenses.empty:
+        return []
+
+    # Compare current month with a rolling baseline of the previous 6 full months.
+    current_period = pd.Timestamp.today().to_period("M")
+    history_periods = pd.period_range(end=current_period - 1, periods=6, freq="M")
+
+    expenses["month"] = expenses["date"].dt.to_period("M")
+    current_month_expense = (
+        expenses[expenses["month"] == current_period]
+        .groupby("category")["amount"]
+        .sum()
+    )
+
+    historical = expenses[expenses["month"].isin(history_periods)]
+    if historical.empty:
+        return []
+
+    alerts: list[str] = []
+    for category in current_month_expense.index:
+        category_history = (
+            historical[historical["category"] == category]
+            .groupby("month")["amount"]
+            .sum()
+            .reindex(history_periods, fill_value=0.0)
+        )
+        historical_average = float(category_history.mean())
+        current_total = float(current_month_expense.loc[category])
+
+        if historical_average <= 0:
+            continue
+
+        increase_ratio = (current_total - historical_average) / historical_average
+        if increase_ratio > 0.30:
+            alerts.append(
+                f"Overspending alert: {category} spending is {increase_ratio * 100:.1f}% above your 6-month average this month."
+            )
+
+    return alerts
+
+
+@lru_cache(maxsize=1)
+def _build_internal_categorizer() -> Pipeline:
+    """Train and cache a lightweight text model for quick expense categorization."""
+    samples: dict[str, str] = {
+        "Starbucks coffee": "Food",
+        "Dominos pizza": "Food",
+        "Swiggy order": "Food",
+        "Uber ride": "Transport",
+        "Ola cab": "Transport",
+        "Metro recharge": "Transport",
+        "Electricity bill": "Bills",
+        "Water bill": "Bills",
+        "Internet recharge": "Bills",
+        "Movie tickets": "Entertainment",
+        "Netflix subscription": "Entertainment",
+        "Pharmacy medicine": "Health",
+        "Doctor consultation": "Health",
+        "Grocery shopping": "Food",
+        "Amazon shopping": "Shopping",
+        "Clothing purchase": "Shopping",
+    }
+
+    texts = list(samples.keys())
+    labels = list(samples.values())
+
+    model = Pipeline(
+        [
+            ("vectorizer", CountVectorizer()),
+            ("classifier", MultinomialNB()),
+        ]
+    )
+    model.fit(texts, labels)
+    return model
+
+
+def auto_categorize(description: str) -> str:
+    """Predict an expense category from free-text description using CountVectorizer + MultinomialNB."""
+    cleaned_description = description.strip()
+    if not cleaned_description:
+        return "Other"
+
+    model = _build_internal_categorizer()
+    return str(model.predict([cleaned_description])[0])
+
+
+def predict_monthly_expense(user_id: int) -> dict:
+    """Predict upcoming month's total expense using monthly aggregates and linear regression."""
+    frame = _fetch_user_transactions_frame(user_id)
+    if frame.empty:
+        return {"predicted_expense": 0.0, "status": "insufficient-data"}
+
+    expense_frame = frame[frame["type"] == "Expense"].copy()
+    if expense_frame.empty:
+        return {"predicted_expense": 0.0, "status": "no-expenses"}
+
+    expense_frame["month"] = expense_frame["date"].dt.to_period("M")
+    monthly_totals = (
+        expense_frame.groupby("month", as_index=False)["amount"]
+        .sum()
+        .sort_values("month")
+        .reset_index(drop=True)
+    )
+
+    if len(monthly_totals) < 2:
+        return {
+            "predicted_expense": round(float(monthly_totals["amount"].iloc[-1]), 2),
+            "status": "limited-history",
+        }
+
+    x_values = monthly_totals.index.to_numpy().reshape(-1, 1)
+    y_values = monthly_totals["amount"].to_numpy()
+
+    model = LinearRegression()
+    model.fit(x_values, y_values)
+
+    next_month_index = [[len(monthly_totals)]]
+    predicted_expense = float(model.predict(next_month_index)[0])
+    next_month_period = (monthly_totals["month"].iloc[-1] + 1).strftime("%Y-%m")
+
+    return {
+        "predicted_expense": round(max(predicted_expense, 0.0), 2),
+        "next_month": next_month_period,
+        "months_used": int(len(monthly_totals)),
+        "status": "predicted",
+    }
+
+
+def get_ai_suggestions(user_id: int) -> list[str]:
+    """Generate rule-based finance suggestions from income, food spend, and savings behavior."""
+    frame = _fetch_user_transactions_frame(user_id)
+    if frame.empty:
+        return ["Add transactions to unlock AI suggestions."]
+
+    total_income = float(frame.loc[frame["type"] == "Income", "amount"].sum())
+    total_expense = float(frame.loc[frame["type"] == "Expense", "amount"].sum())
+    food_expense = float(
+        frame.loc[
+            (frame["type"] == "Expense") & (frame["category"].str.lower() == "food"),
+            "amount",
+        ].sum()
+    )
+
+    if total_income <= 0:
+        return ["Add at least one income transaction so AI suggestions can be calculated."]
+
+    savings_amount = total_income - total_expense
+    suggestions: list[str] = []
+
+    if food_expense > 0.30 * total_income:
+        suggestions.append("Food spending is above 30% of income. Consider reducing dining out.")
+
+    if savings_amount < 0.20 * total_income:
+        suggestions.append("Savings are below 20% of income. Consider setting a stricter budget.")
+
+    if not suggestions:
+        suggestions.append("Your spending and savings pattern looks healthy. Keep tracking consistently.")
+
+    return suggestions
+
+
+def check_budget_threshold_alerts(user_id: int, threshold: float = 0.85) -> list[dict]:
+    """Return budget usage alerts when category spend crosses the configured threshold."""
+    frame = _fetch_user_transactions_frame(user_id)
+    if frame.empty:
+        return []
+
+    monthly_budgets = fetch_user_category_budgets(user_id)
+    if not monthly_budgets:
+        return []
+
+    expenses = frame[frame["type"] == "Expense"].copy()
+    if expenses.empty:
+        return []
+
+    current_month = pd.Timestamp.today().to_period("M")
+    expenses["month"] = expenses["date"].dt.to_period("M")
+    current_totals = (
+        expenses[expenses["month"] == current_month]
+        .groupby("category")["amount"]
+        .sum()
+    )
+
+    alerts: list[dict] = []
+    for category, budget in monthly_budgets.items():
+        spent = float(current_totals.get(category, 0.0))
+        usage_ratio = spent / budget if budget > 0 else 0.0
+
+        if usage_ratio >= threshold:
+            alerts.append(
+                {
+                    "category": category,
+                    "budget": round(budget, 2),
+                    "spent": round(spent, 2),
+                    "usage_percent": round(usage_ratio * 100, 1),
+                    "message": f"Alert: You have used {usage_ratio * 100:.1f}% of your monthly {category.lower()} budget.",
+                    "is_exceeded": usage_ratio >= 1.0,
+                }
+            )
+
+    alerts.sort(key=lambda item: item["usage_percent"], reverse=True)
+    return alerts
+
+
+def collect_new_budget_crossings(user_id: int, thresholds: tuple[int, ...] = (85, 100)) -> list[dict]:
+    """Persist and return new monthly budget threshold crossing events for notifications."""
+    alerts = check_budget_threshold_alerts(user_id, threshold=min(thresholds) / 100)
+    if not alerts:
+        return []
+
+    current_month = pd.Timestamp.today().strftime("%Y-%m")
+    new_events: list[dict] = []
+
+    for alert in alerts:
+        usage_percent = float(alert["usage_percent"])
+        for threshold in sorted(thresholds):
+            if usage_percent < threshold:
+                continue
+
+            was_created = create_budget_alert_event(
+                user_id=user_id,
+                category=alert["category"],
+                month=current_month,
+                threshold_percent=int(threshold),
+                usage_percent=usage_percent,
+            )
+            if was_created:
+                new_events.append(
+                    {
+                        "category": alert["category"],
+                        "month": current_month,
+                        "threshold_percent": int(threshold),
+                        "usage_percent": usage_percent,
+                        "budget": alert["budget"],
+                        "spent": alert["spent"],
+                        "message": (
+                            f"You crossed {threshold}% of your monthly {alert['category'].lower()} budget "
+                            f"({usage_percent:.1f}% used)."
+                        ),
+                    }
+                )
+
+    new_events.sort(key=lambda item: (item["threshold_percent"], item["usage_percent"]), reverse=True)
+    return new_events

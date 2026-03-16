@@ -11,6 +11,16 @@ from werkzeug.security import generate_password_hash
 BASE_DIR = Path(__file__).resolve().parent.parent
 DATABASE_PATH = BASE_DIR / "database.db"
 
+DEFAULT_CATEGORY_BUDGETS: dict[str, float] = {
+    "Food": 12000.0,
+    "Transport": 6000.0,
+    "Bills": 9000.0,
+    "Entertainment": 5000.0,
+    "Health": 7000.0,
+    "Shopping": 8000.0,
+    "Other": 4000.0,
+}
+
 
 def get_db_connection() -> sqlite3.Connection:
     """Return a SQLite connection with dict-like row access."""
@@ -50,6 +60,50 @@ def init_db() -> None:
         """
     )
 
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS category_budgets (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            category TEXT NOT NULL,
+            monthly_budget REAL NOT NULL,
+            UNIQUE (user_id, category),
+            FOREIGN KEY (user_id) REFERENCES users (id)
+        )
+        """
+    )
+
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS budget_alert_events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            category TEXT NOT NULL,
+            month TEXT NOT NULL,
+            threshold_percent INTEGER NOT NULL,
+            usage_percent REAL NOT NULL,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE (user_id, category, month, threshold_percent),
+            FOREIGN KEY (user_id) REFERENCES users (id)
+        )
+        """
+    )
+
+    connection.commit()
+    connection.close()
+
+
+def seed_user_budgets(user_id: int) -> None:
+    """Ensure a user has baseline monthly budgets for all supported categories."""
+    connection = get_db_connection()
+    cursor = connection.cursor()
+    cursor.executemany(
+        """
+        INSERT OR IGNORE INTO category_budgets (user_id, category, monthly_budget)
+        VALUES (?, ?, ?)
+        """,
+        [(user_id, category, budget) for category, budget in DEFAULT_CATEGORY_BUDGETS.items()],
+    )
     connection.commit()
     connection.close()
 
@@ -72,6 +126,8 @@ def seed_demo_account() -> None:
         demo_user_id = cursor.lastrowid
     else:
         demo_user_id = demo_user["id"]
+
+    seed_user_budgets(demo_user_id)
 
     existing_transactions = cursor.execute(
         "SELECT COUNT(*) AS total FROM transactions WHERE user_id = ?",
@@ -136,3 +192,60 @@ def seed_demo_income(user_id: int) -> None:
         connection.commit()
 
     connection.close()
+
+
+def fetch_user_category_budgets(user_id: int) -> dict[str, float]:
+    """Return all category budgets for a user, auto-seeding defaults when needed."""
+    seed_user_budgets(user_id)
+    connection = get_db_connection()
+    rows = connection.execute(
+        """
+        SELECT category, monthly_budget
+        FROM category_budgets
+        WHERE user_id = ?
+        """,
+        (user_id,),
+    ).fetchall()
+    connection.close()
+    return {row["category"]: float(row["monthly_budget"]) for row in rows}
+
+
+def update_user_category_budgets(user_id: int, budgets: dict[str, float]) -> None:
+    """Upsert category budgets for a user from validated input."""
+    connection = get_db_connection()
+    cursor = connection.cursor()
+    cursor.executemany(
+        """
+        INSERT INTO category_budgets (user_id, category, monthly_budget)
+        VALUES (?, ?, ?)
+        ON CONFLICT(user_id, category)
+        DO UPDATE SET monthly_budget = excluded.monthly_budget
+        """,
+        [(user_id, category, amount) for category, amount in budgets.items()],
+    )
+    connection.commit()
+    connection.close()
+
+
+def create_budget_alert_event(
+    user_id: int,
+    category: str,
+    month: str,
+    threshold_percent: int,
+    usage_percent: float,
+) -> bool:
+    """Insert a monthly alert event once; return True only when a new event is created."""
+    connection = get_db_connection()
+    cursor = connection.cursor()
+    cursor.execute(
+        """
+        INSERT OR IGNORE INTO budget_alert_events
+            (user_id, category, month, threshold_percent, usage_percent)
+        VALUES (?, ?, ?, ?, ?)
+        """,
+        (user_id, category, month, threshold_percent, usage_percent),
+    )
+    connection.commit()
+    was_created = cursor.rowcount > 0
+    connection.close()
+    return was_created

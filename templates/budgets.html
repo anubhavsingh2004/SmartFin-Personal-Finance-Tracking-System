@@ -1,0 +1,46 @@
+{% extends 'base.html' %}
+
+{% block title %}Budgets | SmartFin{% endblock %}
+
+{% block content %}
+<section class="page-header">
+    <div>
+        <span class="eyebrow">Budget controls</span>
+        <h1>Set custom monthly category budgets</h1>
+        <p>These limits power threshold alerts at 85% and critical alerts at 100% usage.</p>
+    </div>
+</section>
+
+<section class="form-panel wide-form-panel">
+    <form method="POST" class="form-grid">
+        <div class="budget-grid">
+            {% for category in categories %}
+            <label>
+                <span>{{ category }} Budget (Rs.)</span>
+                <input
+                    type="number"
+                    name="{{ category }}"
+                    step="0.01"
+                    min="0"
+                    value="{{ '%.2f'|format(budgets.get(category, 0.0)) }}"
+                    required
+                >
+            </label>
+            {% endfor %}
+        </div>
+
+        <div class="inline-note full-width-label">
+            {% if email_enabled %}
+            <p>Email notifications are enabled. New threshold crossings at 85% and 100% will trigger emails.</p>
+            {% else %}
+            <p>Email notifications are currently disabled. Configure SMARTFIN_SMTP_HOST, SMARTFIN_SMTP_PORT, SMARTFIN_SMTP_USERNAME, SMARTFIN_SMTP_PASSWORD, and SMARTFIN_EMAIL_FROM.</p>
+            {% endif %}
+        </div>
+
+        <div class="full-width-label form-actions-row">
+            <button type="submit" class="primary-btn">Save Budgets</button>
+            <a href="{{ url_for('dashboard') }}" class="secondary-btn">Back to Dashboard</a>
+        </div>
+    </form>
+</section>
+{% endblock %}

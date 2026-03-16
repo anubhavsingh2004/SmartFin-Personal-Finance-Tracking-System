@@ -34,12 +34,32 @@
 {% if overspending.is_overspending %}
 <section class="alert-banner danger-banner">
     <strong>Overspending Alert</strong>
-    <p>{{ overspending.message }} Current expense-to-income ratio: {{ '%.2f'|format(overspending.ratio) }}%</p>
+    <p>Current expense-to-income ratio: {{ '%.2f'|format(overspending.ratio) }}%</p>
+    <ul class="suggestion-list">
+        {% for alert in overspending.alerts %}
+        <li>{{ alert }}</li>
+        {% endfor %}
+    </ul>
 </section>
 {% else %}
 <section class="alert-banner success-banner">
     <strong>Healthy Spending</strong>
-    <p>{{ overspending.message }}</p>
+    <p>{{ overspending.message }} Current expense-to-income ratio: {{ '%.2f'|format(overspending.ratio) }}%</p>
+</section>
+{% endif %}
+
+{% if budget_alerts %}
+<section class="alert-banner warning-banner">
+    <strong>Budget Threshold Notifications</strong>
+    <p>One or more categories have crossed 85% of their configured monthly budget.</p>
+    <ul class="suggestion-list">
+        {% for item in budget_alerts %}
+        <li>
+            {{ item.message }}
+            (Spent: Rs. {{ '%.2f'|format(item.spent) }} / Budget: Rs. {{ '%.2f'|format(item.budget) }})
+        </li>
+        {% endfor %}
+    </ul>
 </section>
 {% endif %}
 

@@ -25,10 +25,42 @@
         <strong>{{ '%.2f'|format(summary.savings_rate) }}%</strong>
     </article>
     <article class="stat-card prediction-card">
-        <span>Overspending Ratio</span>
-        <strong>{{ '%.2f'|format(overspending.ratio) }}%</strong>
+        <span>Predicted Next Month Expense</span>
+        <strong>Rs. {{ '%.2f'|format(prediction.predicted_expense) }}</strong>
     </article>
 </section>
+
+{% if overspending_alerts %}
+<section class="alert-banner danger-banner">
+    <strong>Category Overspending Alerts</strong>
+    <p>These categories are above the 30% threshold compared with your last 6-month average.</p>
+    <ul class="suggestion-list">
+        {% for alert in overspending_alerts %}
+        <li>{{ alert }}</li>
+        {% endfor %}
+    </ul>
+</section>
+{% else %}
+<section class="alert-banner success-banner">
+    <strong>Category Spending Is Stable</strong>
+    <p>No category is currently above the 30% overspending threshold.</p>
+</section>
+{% endif %}
+
+{% if budget_alerts %}
+<section class="alert-banner warning-banner">
+    <strong>Budget Threshold Notifications</strong>
+    <p>The following categories have reached at least 85% of their monthly budget.</p>
+    <ul class="suggestion-list">
+        {% for item in budget_alerts %}
+        <li>
+            {{ item.message }}
+            (Spent: Rs. {{ '%.2f'|format(item.spent) }} / Budget: Rs. {{ '%.2f'|format(item.budget) }})
+        </li>
+        {% endfor %}
+    </ul>
+</section>
+{% endif %}
 
 <section class="dashboard-grid">
     <article class="panel chart-panel">
