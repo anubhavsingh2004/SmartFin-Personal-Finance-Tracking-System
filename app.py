@@ -3,13 +3,15 @@
 from __future__ import annotations
 
 import os
+import csv
 import smtplib
+from io import BytesIO, StringIO
 from datetime import datetime
 from email.message import EmailMessage
 from functools import wraps
 
 from dotenv import load_dotenv
-from flask import Flask, flash, jsonify, redirect, render_template, request, session, url_for
+from flask import Flask, flash, jsonify, redirect, render_template, request, send_file, session, url_for
 from werkzeug.security import check_password_hash, generate_password_hash
 
 load_dotenv()
@@ -30,6 +32,7 @@ from utils.ml_utils import (
     check_budget_threshold_alerts,
     check_overspending,
     collect_new_budget_crossings,
+    generate_financial_suggestions,
     get_ai_suggestions,
     predict_monthly_expense,
 )
@@ -94,6 +97,76 @@ def fetch_user_profile(user_id: int) -> dict | None:
     return dict(row) if row else None
 
 
+def resolve_report_month(raw_month: str | None) -> str:
+    """Normalize report month input to YYYY-MM, defaulting to current month."""
+    month_value = (raw_month or "").strip()
+    if not month_value:
+        return datetime.today().strftime("%Y-%m")
+
+    try:
+        datetime.strptime(month_value, "%Y-%m")
+    except ValueError:
+        return datetime.today().strftime("%Y-%m")
+
+    return month_value
+
+
+def filter_transactions_by_month(transactions: list[dict], month: str) -> list[dict]:
+    """Return only transactions whose date falls in the provided YYYY-MM month."""
+    month_prefix = f"{month}-"
+    return [item for item in transactions if str(item.get("date", "")).startswith(month_prefix)]
+
+
+def build_monthly_report_csv(
+    user_name: str,
+    month: str,
+    summary: dict,
+    transactions: list[dict],
+    suggestions: list[str],
+) -> str:
+    """Create monthly report CSV content with summary and transaction details."""
+    output = StringIO(newline="")
+    writer = csv.writer(output)
+
+    writer.writerow(["SmartFin Monthly Report"])
+    writer.writerow(["User", user_name])
+    writer.writerow(["Month", month])
+    writer.writerow([])
+
+    writer.writerow(["Summary"])
+    writer.writerow(["Total Income", f"{summary['total_income']:.2f}"])
+    writer.writerow(["Total Expenses", f"{summary['total_expenses']:.2f}"])
+    writer.writerow(["Balance", f"{summary['balance']:.2f}"])
+    writer.writerow(["Savings Rate (%)", f"{summary['savings_rate']:.2f}"])
+    writer.writerow([])
+
+    writer.writerow(["Suggestions"])
+    if suggestions:
+        for suggestion in suggestions:
+            writer.writerow([suggestion])
+    else:
+        writer.writerow(["No suggestions available for this month."])
+    writer.writerow([])
+
+    writer.writerow(["Transactions"])
+    writer.writerow(["Date", "Description", "Category", "Type", "Amount"])
+    for transaction in transactions:
+        writer.writerow(
+            [
+                transaction.get("date", ""),
+                transaction.get("description", ""),
+                transaction.get("category", ""),
+                transaction.get("type", ""),
+                f"{float(transaction.get('amount', 0.0)):.2f}",
+            ]
+        )
+
+    if not transactions:
+        writer.writerow(["-", "No transactions available for this month", "-", "-", "0.00"])
+
+    return output.getvalue()
+
+
 def _smtp_config() -> dict:
     """Return SMTP configuration loaded from environment variables."""
     return {
@@ -134,6 +207,48 @@ def send_budget_alert_email(user_profile: dict, event: dict) -> bool:
     message["From"] = config["from_email"]
     message["To"] = user_profile["email"]
     message.set_content(body)
+
+    try:
+        with smtplib.SMTP(config["host"], config["port"], timeout=10) as server:
+            if config["use_tls"]:
+                server.starttls()
+            if config["username"] and config["password"]:
+                server.login(config["username"], config["password"])
+            server.send_message(message)
+        return True
+    except Exception:
+        return False
+
+
+def send_monthly_report_email(user_profile: dict, month: str, report_csv: str, summary: dict) -> bool:
+    """Email a monthly CSV report to the current user."""
+    config = _smtp_config()
+    if not _is_email_configured() or not user_profile.get("email"):
+        return False
+
+    subject = f"SmartFin Monthly Report - {month}"
+    body = (
+        f"Hi {user_profile.get('name', 'User')},\n\n"
+        f"Your SmartFin monthly report for {month} is attached.\n\n"
+        f"Summary:\n"
+        f"- Total Income: Rs. {summary['total_income']:.2f}\n"
+        f"- Total Expenses: Rs. {summary['total_expenses']:.2f}\n"
+        f"- Balance: Rs. {summary['balance']:.2f}\n"
+        f"- Savings Rate: {summary['savings_rate']:.2f}%\n\n"
+        "Thanks for using SmartFin.\n"
+    )
+
+    message = EmailMessage()
+    message["Subject"] = subject
+    message["From"] = config["from_email"]
+    message["To"] = user_profile["email"]
+    message.set_content(body)
+    message.add_attachment(
+        report_csv.encode("utf-8"),
+        maintype="text",
+        subtype="csv",
+        filename=f"smartfin-monthly-report-{month}.csv",
+    )
 
     try:
         with smtplib.SMTP(config["host"], config["port"], timeout=10) as server:
@@ -464,16 +579,46 @@ def edit_transaction(transaction_id: int):
         process_budget_notifications(user_id)
 
         flash("Transaction updated successfully.", "success")
+        next_page = request.form.get("next", "reports").strip().lower()
+        if next_page == "dashboard":
+            return redirect(url_for("dashboard"))
         return redirect(url_for("reports"))
 
     return render_template("edit_transaction.html", transaction=transaction, predicted_category=predicted_category)
+
+
+@app.route("/transaction/<int:transaction_id>/delete", methods=["POST"])
+@login_required
+def delete_transaction(transaction_id: int):
+    user_id = int(session["user_id"])
+    transaction = fetch_transaction_by_id(user_id, transaction_id)
+
+    if transaction is None:
+        flash("Transaction not found or you do not have permission to delete it.", "danger")
+    else:
+        connection = get_db_connection()
+        connection.execute(
+            "DELETE FROM transactions WHERE id = ? AND user_id = ?",
+            (transaction_id, user_id),
+        )
+        connection.commit()
+        connection.close()
+        flash("Transaction deleted successfully.", "success")
+
+    next_page = request.form.get("next", "reports").strip().lower()
+    if next_page == "dashboard":
+        return redirect(url_for("dashboard"))
+    return redirect(url_for("reports"))
 
 
 @app.route("/reports")
 @login_required
 def reports():
     user_id = int(session["user_id"])
+    selected_month = resolve_report_month(request.args.get("month"))
     transactions = fetch_user_transactions(user_id)
+    monthly_transactions = filter_transactions_by_month(transactions, selected_month)
+    monthly_summary = calculate_summary(monthly_transactions)
     summary = calculate_summary(transactions)
     suggestions = get_ai_suggestions(user_id)
     prediction = predict_monthly_expense(user_id)
@@ -501,7 +646,73 @@ def reports():
         budget_alerts=budget_alerts,
         transactions=transactions[:15],
         model_notes=build_model_notes(prediction, overspending),
+        selected_month=selected_month,
+        monthly_summary=monthly_summary,
+        monthly_transaction_count=len(monthly_transactions),
     )
+
+
+@app.route("/reports/monthly/download")
+@login_required
+def download_monthly_report():
+    user_id = int(session["user_id"])
+    selected_month = resolve_report_month(request.args.get("month"))
+
+    transactions = fetch_user_transactions(user_id)
+    monthly_transactions = filter_transactions_by_month(transactions, selected_month)
+    monthly_summary = calculate_summary(monthly_transactions)
+    suggestions = generate_financial_suggestions(monthly_transactions)
+
+    report_csv = build_monthly_report_csv(
+        user_name=session.get("user_name", "User"),
+        month=selected_month,
+        summary=monthly_summary,
+        transactions=monthly_transactions,
+        suggestions=suggestions,
+    )
+
+    filename = f"smartfin-monthly-report-{selected_month}.csv"
+    return send_file(
+        BytesIO(report_csv.encode("utf-8")),
+        mimetype="text/csv",
+        as_attachment=True,
+        download_name=filename,
+    )
+
+
+@app.route("/reports/monthly/email", methods=["POST"])
+@login_required
+def email_monthly_report():
+    user_id = int(session["user_id"])
+    selected_month = resolve_report_month(request.form.get("month"))
+    user_profile = fetch_user_profile(user_id)
+
+    if user_profile is None or not user_profile.get("email"):
+        flash("No email address found for your account.", "danger")
+        return redirect(url_for("reports", month=selected_month))
+
+    if not _is_email_configured():
+        flash("Monthly report email is disabled. Configure SMARTFIN_SMTP_* and SMARTFIN_EMAIL_FROM to enable it.", "info")
+        return redirect(url_for("reports", month=selected_month))
+
+    transactions = fetch_user_transactions(user_id)
+    monthly_transactions = filter_transactions_by_month(transactions, selected_month)
+    monthly_summary = calculate_summary(monthly_transactions)
+    suggestions = generate_financial_suggestions(monthly_transactions)
+    report_csv = build_monthly_report_csv(
+        user_name=user_profile.get("name", "User"),
+        month=selected_month,
+        summary=monthly_summary,
+        transactions=monthly_transactions,
+        suggestions=suggestions,
+    )
+
+    if send_monthly_report_email(user_profile, selected_month, report_csv, monthly_summary):
+        flash(f"Monthly report for {selected_month} was emailed to {user_profile['email']}.", "success")
+    else:
+        flash("Unable to send monthly report email right now. Please verify SMTP settings and try again.", "danger")
+
+    return redirect(url_for("reports", month=selected_month))
 
 
 @app.route("/budgets", methods=["GET", "POST"])

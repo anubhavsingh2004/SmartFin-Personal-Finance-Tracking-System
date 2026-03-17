@@ -11,6 +11,55 @@
     </div>
 </section>
 
+<section class="panel report-actions-panel">
+    <div class="panel-heading">
+        <h2>Monthly Report Actions</h2>
+        <p>Pick a month to download the report or send it to your registered email.</p>
+    </div>
+    <div class="report-actions-grid">
+        <form method="get" action="{{ url_for('reports') }}" class="report-filter-form">
+            <label>
+                Report Month
+                <input type="month" name="month" value="{{ selected_month }}" required>
+            </label>
+            <button type="submit" class="secondary-btn">Load Month</button>
+        </form>
+
+        <a href="{{ url_for('download_monthly_report', month=selected_month) }}" class="primary-btn">Download Monthly CSV</a>
+
+        <form method="post" action="{{ url_for('email_monthly_report') }}">
+            <input type="hidden" name="month" value="{{ selected_month }}">
+            <button type="submit" class="secondary-btn">Email Monthly Report</button>
+        </form>
+    </div>
+    <div class="monthly-snapshot-grid">
+        <div class="note-card">
+            <strong>Selected Month</strong>
+            <p>{{ selected_month }}</p>
+        </div>
+        <div class="note-card">
+            <strong>Transactions</strong>
+            <p>{{ monthly_transaction_count }}</p>
+        </div>
+        <div class="note-card">
+            <strong>Monthly Income</strong>
+            <p>Rs. {{ '%.2f'|format(monthly_summary.total_income) }}</p>
+        </div>
+        <div class="note-card">
+            <strong>Monthly Expenses</strong>
+            <p>Rs. {{ '%.2f'|format(monthly_summary.total_expenses) }}</p>
+        </div>
+        <div class="note-card">
+            <strong>Monthly Balance</strong>
+            <p>Rs. {{ '%.2f'|format(monthly_summary.balance) }}</p>
+        </div>
+        <div class="note-card">
+            <strong>Monthly Savings Rate</strong>
+            <p>{{ '%.2f'|format(monthly_summary.savings_rate) }}%</p>
+        </div>
+    </div>
+</section>
+
 <section class="stats-grid compact-grid">
     <article class="stat-card">
         <span>Income</span>
@@ -145,6 +194,10 @@
                         <td>Rs. {{ '%.2f'|format(transaction.amount) }}</td>
                         <td class="row-actions">
                             <a href="{{ url_for('edit_transaction', transaction_id=transaction.id) }}" class="row-action-btn">Edit</a>
+                            <form method="post" action="{{ url_for('delete_transaction', transaction_id=transaction.id) }}" onsubmit="return confirm('Delete this transaction permanently?');">
+                                <input type="hidden" name="next" value="reports">
+                                <button type="submit" class="row-action-btn delete-btn">Delete</button>
+                            </form>
                         </td>
                     </tr>
                     {% else %}
