@@ -27,9 +27,10 @@
 
         <a href="{{ url_for('download_monthly_report', month=selected_month) }}" class="primary-btn">Download Monthly CSV</a>
 
-        <form method="post" action="{{ url_for('email_monthly_report') }}">
+        <form method="post" action="{{ url_for('email_monthly_report') }}" id="emailMonthlyForm">
             <input type="hidden" name="month" value="{{ selected_month }}">
-            <button type="submit" class="secondary-btn">Email Monthly Report</button>
+            <button type="submit" class="secondary-btn" id="emailBtn" data-cooldown-ms="10000">Email Monthly Report</button>
+            <span id="emailCooldownMessage" class="inline-cooldown-message" aria-live="polite"></span>
         </form>
     </div>
     <div class="monthly-snapshot-grid">
@@ -150,21 +151,6 @@
 
     <article class="panel">
         <div class="panel-heading">
-            <h2>Model Summary</h2>
-            <p>Explainable view of the classification, forecasting, and alert logic used in this project.</p>
-        </div>
-        <div class="note-grid">
-            {% for note in model_notes %}
-            <div class="note-card">
-                <strong>{{ note.title }}</strong>
-                <p>{{ note.detail }}</p>
-            </div>
-            {% endfor %}
-        </div>
-    </article>
-
-    <article class="panel">
-        <div class="panel-heading">
             <h2>Latest Transactions</h2>
             <p>Recent entries included in the report.</p>
         </div>
@@ -210,4 +196,70 @@
         </div>
     </article>
 </section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const emailButton = document.getElementById('emailBtn');
+    const emailForm = document.getElementById('emailMonthlyForm');
+    const cooldownMessage = document.getElementById('emailCooldownMessage');
+    if (!emailButton || !emailForm || !cooldownMessage) {
+        return;
+    }
+
+    const storageKey = 'smartfinEmailCooldownUntil';
+    const cooldown = Number(emailButton.dataset.cooldownMs || '10000');
+    let timerId;
+
+    function setMessage(text) {
+        cooldownMessage.textContent = text;
+    }
+
+    function getRemainingMs() {
+        const cooldownUntil = Number(sessionStorage.getItem(storageKey) || '0');
+        return Math.max(0, cooldownUntil - Date.now());
+    }
+
+    function startCountdown(initialRemainingMs) {
+        clearInterval(timerId);
+
+        function tick() {
+            const remainingMs = initialRemainingMs !== null ? initialRemainingMs : getRemainingMs();
+            initialRemainingMs = null;
+
+            if (remainingMs <= 0) {
+                setMessage('');
+                sessionStorage.removeItem(storageKey);
+                clearInterval(timerId);
+                return;
+            }
+
+            const seconds = Math.ceil(remainingMs / 1000);
+            setMessage('Please wait. Try again in ' + seconds + 's');
+        }
+
+        tick();
+        timerId = setInterval(tick, 1000);
+    }
+
+    const initialRemaining = getRemainingMs();
+    if (initialRemaining > 0) {
+        startCountdown(initialRemaining);
+    }
+
+    emailForm.addEventListener('submit', function (event) {
+        const remainingMs = getRemainingMs();
+        if (remainingMs > 0) {
+            event.preventDefault();
+            startCountdown(remainingMs);
+            return;
+        }
+
+        const cooldownUntil = Date.now() + cooldown;
+        sessionStorage.setItem(storageKey, String(cooldownUntil));
+        startCountdown(cooldown);
+    });
+});
+</script>
 {% endblock %}

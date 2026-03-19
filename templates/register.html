@@ -3,35 +3,41 @@
 {% block title %}Register | SmartFin{% endblock %}
 
 {% block content %}
-<section class="auth-layout">
-    <div class="auth-copy">
-        <span class="eyebrow">Build a better budget</span>
-        <h1>Create your SmartFin account.</h1>
-        <p>Log income and expenses, detect overspending patterns, and generate explainable analytics for your personal finance workflow.</p>
-    </div>
+<section class="login-stage">
+    <div class="login-card-shell">
+        <div class="login-left-pane">
+            <h1>Create Your Account</h1>
+            <p>Set up SmartFin and start tracking your spending, income, and monthly goals.</p>
+            <ul class="login-feature-list">
+                <li>Add and organize transactions quickly</li>
+                <li>Monitor spending patterns by category</li>
+                <li>Plan monthly budgets with confidence</li>
+            </ul>
+        </div>
 
-    <div class="auth-card">
-        <h2>Register</h2>
-        <form method="POST" class="form-grid">
-            <label>
-                <span>Full Name</span>
-                <input type="text" name="name" placeholder="Your name" required>
-            </label>
-            <label>
-                <span>Email</span>
-                <input type="email" name="email" placeholder="you@example.com" required>
-            </label>
-            <label>
-                <span>Password</span>
-                <input type="password" name="password" placeholder="Create password" required>
-            </label>
-            <label>
-                <span>Confirm Password</span>
-                <input type="password" name="confirm_password" placeholder="Confirm password" required>
-            </label>
-            <button type="submit" class="primary-btn">Create Account</button>
-        </form>
-        <p class="auth-footnote">Already registered? <a href="{{ url_for('login') }}">Login here</a></p>
+        <div class="login-right-pane">
+            <h2>Register</h2>
+            <form method="POST" class="form-grid">
+                <label>
+                    <span>Full Name</span>
+                    <input type="text" name="name" placeholder="Your name" required>
+                </label>
+                <label>
+                    <span>Email</span>
+                    <input type="email" name="email" placeholder="you@example.com" required>
+                </label>
+                <label>
+                    <span>Password</span>
+                    <input type="password" name="password" placeholder="Create password" required>
+                </label>
+                <label>
+                    <span>Confirm Password</span>
+                    <input type="password" name="confirm_password" placeholder="Confirm password" required>
+                </label>
+                <button type="submit" class="primary-btn">Create Account</button>
+            </form>
+            <p class="auth-footnote">Already registered? <a href="{{ url_for('login') }}">Login here</a></p>
+        </div>
     </div>
 </section>
 {% endblock %}

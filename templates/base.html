@@ -11,8 +11,8 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
-    <div class="page-shell">
-        {% if session.get('user_id') %}
+    <div class="page-shell{% if session.get('user_id') and request.endpoint not in ['login', 'register'] %} with-sidebar{% endif %}">
+        {% if session.get('user_id') and request.endpoint not in ['login', 'register'] %}
         <aside class="sidebar">
             <div>
                 <a href="{{ url_for('dashboard') }}" class="brand">SmartFin</a>
@@ -31,9 +31,12 @@
         <main class="main-shell {% if not session.get('user_id') %}auth-shell{% endif %}">
             {% with messages = get_flashed_messages(with_categories=true) %}
                 {% if messages %}
-                    <div class="flash-stack">
+                    <div class="flash-stack" id="flashStack">
                         {% for category, message in messages %}
-                            <div class="flash flash-{{ category }}">{{ message }}</div>
+                            <div class="flash flash-{{ category }}" data-auto-dismiss="true" role="status" aria-live="polite">
+                                <span class="flash-message">{{ message }}</span>
+                                <button type="button" class="flash-close" aria-label="Dismiss notification">&times;</button>
+                            </div>
                         {% endfor %}
                     </div>
                 {% endif %}
@@ -43,6 +46,44 @@
         </main>
     </div>
     <script src="{{ url_for('static', filename='js/charts.js') }}"></script>
+    <script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const flashStack = document.getElementById('flashStack');
+        if (!flashStack) {
+            return;
+        }
+
+        const flashes = flashStack.querySelectorAll('.flash[data-auto-dismiss="true"]');
+
+        function removeFlash(flash) {
+            if (!flash || flash.classList.contains('flash-hide')) {
+                return;
+            }
+            flash.classList.add('flash-hide');
+            window.setTimeout(function () {
+                flash.remove();
+                if (!flashStack.querySelector('.flash')) {
+                    flashStack.remove();
+                }
+            }, 300);
+        }
+
+        flashes.forEach(function (flash, index) {
+            const dismissDelay = 6500 + index * 150;
+            const timeoutId = window.setTimeout(function () {
+                removeFlash(flash);
+            }, dismissDelay);
+
+            const closeButton = flash.querySelector('.flash-close');
+            if (closeButton) {
+                closeButton.addEventListener('click', function () {
+                    window.clearTimeout(timeoutId);
+                    removeFlash(flash);
+                });
+            }
+        });
+    });
+    </script>
     {% block scripts %}{% endblock %}
 </body>
 </html>

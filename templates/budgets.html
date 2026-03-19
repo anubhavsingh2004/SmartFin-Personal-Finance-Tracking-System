@@ -29,14 +29,6 @@
             {% endfor %}
         </div>
 
-        <div class="inline-note full-width-label">
-            {% if email_enabled %}
-            <p>Email notifications are enabled. New threshold crossings at 85% and 100% will trigger emails.</p>
-            {% else %}
-            <p>Email notifications are currently disabled. Configure SMARTFIN_SMTP_HOST, SMARTFIN_SMTP_PORT, SMARTFIN_SMTP_USERNAME, SMARTFIN_SMTP_PASSWORD, and SMARTFIN_EMAIL_FROM.</p>
-            {% endif %}
-        </div>
-
         <div class="full-width-label form-actions-row">
             <button type="submit" class="primary-btn">Save Budgets</button>
             <a href="{{ url_for('dashboard') }}" class="secondary-btn">Back to Dashboard</a>

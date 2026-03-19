@@ -5,6 +5,8 @@ from __future__ import annotations
 import os
 import csv
 import smtplib
+import time
+from threading import Lock
 from io import BytesIO, StringIO
 from datetime import datetime
 from email.message import EmailMessage
@@ -40,6 +42,10 @@ from utils.ml_utils import (
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = os.environ.get("SMARTFIN_SECRET_KEY", "smartfin-dev-secret-key")
+
+EMAIL_REPORT_COOLDOWN_SECONDS = 10
+_email_report_cooldowns: dict[int, float] = {}
+_email_report_cooldown_lock = Lock()
 
 
 def login_required(view_function):
@@ -260,6 +266,21 @@ def send_monthly_report_email(user_profile: dict, month: str, report_csv: str, s
         return True
     except Exception:
         return False
+
+
+def can_send_monthly_report_email(user_id: int, cooldown_seconds: int = EMAIL_REPORT_COOLDOWN_SECONDS) -> tuple[bool, int]:
+    """Return whether user can send now and remaining cooldown seconds if blocked."""
+    now = time.monotonic()
+    with _email_report_cooldown_lock:
+        last_sent_at = _email_report_cooldowns.get(user_id)
+        if last_sent_at is not None:
+            elapsed = now - last_sent_at
+            if elapsed < cooldown_seconds:
+                remaining = int(cooldown_seconds - elapsed)
+                return False, max(1, remaining)
+
+        _email_report_cooldowns[user_id] = now
+        return True, 0
 
 
 def process_budget_notifications(user_id: int) -> list[dict]:
@@ -695,6 +716,11 @@ def email_monthly_report():
         flash("Monthly report email is disabled. Configure SMARTFIN_SMTP_* and SMARTFIN_EMAIL_FROM to enable it.", "info")
         return redirect(url_for("reports", month=selected_month))
 
+    can_send, remaining_seconds = can_send_monthly_report_email(user_id)
+    if not can_send:
+        flash(f"Please wait {remaining_seconds} seconds before sending another monthly report email.", "warning")
+        return redirect(url_for("reports", month=selected_month))
+
     transactions = fetch_user_transactions(user_id)
     monthly_transactions = filter_transactions_by_month(transactions, selected_month)
     monthly_summary = calculate_summary(monthly_transactions)
@@ -710,6 +736,8 @@ def email_monthly_report():
     if send_monthly_report_email(user_profile, selected_month, report_csv, monthly_summary):
         flash(f"Monthly report for {selected_month} was emailed to {user_profile['email']}.", "success")
     else:
+        with _email_report_cooldown_lock:
+            _email_report_cooldowns.pop(user_id, None)
         flash("Unable to send monthly report email right now. Please verify SMTP settings and try again.", "danger")
 
     return redirect(url_for("reports", month=selected_month))

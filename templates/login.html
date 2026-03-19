@@ -3,44 +3,34 @@
 {% block title %}Login | SmartFin{% endblock %}
 
 {% block content %}
-<section class="auth-layout">
-    <div class="auth-copy">
-        <span class="eyebrow">AI-powered money assistant</span>
-        <h1>Track spending, predict expenses, and make better decisions.</h1>
-        <p>SmartFin combines Flask, SQLite, Pandas, and Scikit-learn to turn raw transactions into clear financial insights.</p>
-        <div class="auth-highlights">
-            <div class="highlight-card">
-                <strong>Expense categorization</strong>
-                <span>Naive Bayes predicts categories from descriptions.</span>
-            </div>
-            <div class="highlight-card">
-                <strong>Forecasting</strong>
-                <span>Linear Regression estimates the next month's expenses.</span>
-            </div>
+<section class="login-stage">
+    <div class="login-card-shell">
+        <div class="login-left-pane">
+            <h1>Welcome Back</h1>
+            <p>Sign in to continue managing your income, expenses, and budgets.</p>
+            <ul class="login-feature-list">
+                <li>Track transactions in one place</li>
+                <li>View spending and savings trends</li>
+                <li>Set monthly budget targets</li>
+            </ul>
         </div>
-    </div>
 
-    <div class="auth-card">
-        <h2>Login</h2>
-        <form method="POST" class="form-grid">
-            <label>
-                <span>Email</span>
-                <input type="email" name="email" placeholder="you@example.com" required>
-            </label>
-            <label>
-                <span>Password</span>
-                <input type="password" name="password" placeholder="Enter password" required>
-            </label>
-            <button type="submit" class="primary-btn">Sign In</button>
-        </form>
-        <div class="demo-card">
-            <strong>Demo Access</strong>
-            <p>Use the preloaded SmartFin account to open a dashboard with charts, suggestions, and predictions immediately.</p>
-            <p>Email: demo@smartfin.com</p>
-            <p>Password: Demo@123</p>
-            <a href="{{ url_for('demo_login') }}" class="secondary-btn">Enter Demo Dashboard</a>
+        <div class="login-right-pane">
+            <h2>Sign In</h2>
+            <form method="POST" class="form-grid">
+                <label>
+                    <span>Email</span>
+                    <input type="email" name="email" placeholder="you@example.com" required>
+                </label>
+                <label>
+                    <span>Password</span>
+                    <input type="password" name="password" placeholder="Enter password" required>
+                </label>
+                <button type="submit" class="primary-btn">Sign In</button>
+            </form>
+            <p class="auth-footnote">Need quick access? <a href="{{ url_for('demo_login') }}">Enter Demo Dashboard</a></p>
+            <p class="auth-footnote">No account yet? <a href="{{ url_for('register') }}">Create one</a></p>
         </div>
-        <p class="auth-footnote">No account yet? <a href="{{ url_for('register') }}">Create one</a></p>
     </div>
 </section>
 {% endblock %}

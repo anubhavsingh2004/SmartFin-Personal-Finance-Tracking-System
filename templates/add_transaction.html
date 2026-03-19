@@ -36,13 +36,11 @@
             <span>Description</span>
             <textarea name="description" rows="4" placeholder="Example: lunch at cafe, electricity bill, freelance payment" required></textarea>
         </label>
+        {% if predicted_category %}
         <div class="full-width-label inline-note">
-            {% if predicted_category %}
             <p>Predicted category: <strong>{{ predicted_category }}</strong></p>
-            {% else %}
-            <p>Expense descriptions are analyzed by a Naive Bayes classifier trained on seed transaction data.</p>
-            {% endif %}
         </div>
+        {% endif %}
         <button type="submit" class="primary-btn">Save Transaction</button>
     </form>
 </section>
