@@ -219,6 +219,14 @@ On first run, SmartFin automatically:
 - Creates required tables
 - Loads the seed training dataset for ML categorization
 
+When `data/seed_transactions.csv` is updated, SmartFin automatically retrains the categorization model on next startup so new seed examples are applied.
+
+To refresh immediately without restarting, run:
+
+```powershell
+python -c "from models.expense_model import expense_categorizer; expense_categorizer.retrain_with_latest_data(); print('Expense model retrained successfully')"
+```
+
 ## Application Workflow
 
 1. Register a new user account

@@ -26,10 +26,27 @@ class ExpenseCategorizer:
         self.pipeline: Pipeline | None = None
         self._load_or_train()
 
+    def _is_model_stale(self) -> bool:
+        """Return True when the seed dataset changed after the model was saved."""
+        if not MODEL_PATH.exists():
+            return True
+
+        try:
+            model_mtime = MODEL_PATH.stat().st_mtime
+            seed_mtime = SEED_DATA_PATH.stat().st_mtime
+        except OSError:
+            return True
+
+        return seed_mtime > model_mtime
+
     def _load_or_train(self) -> None:
-        if MODEL_PATH.exists():
-            self.pipeline = joblib.load(MODEL_PATH)
-            return
+        if not self._is_model_stale():
+            try:
+                self.pipeline = joblib.load(MODEL_PATH)
+                return
+            except Exception:
+                # If the serialized model is corrupted or incompatible, retrain.
+                self.pipeline = None
 
         self.train_model()
 

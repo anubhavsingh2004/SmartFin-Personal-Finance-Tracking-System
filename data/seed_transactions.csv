@@ -3,27 +3,125 @@ pizza dinner,Food
 grocery shopping,Food
 lunch at cafe,Food
 coffee and snacks,Food
+breakfast sandwich,Food
+bakery croissant and tea,Food
+weekend brunch bill,Food
+office canteen lunch,Food
+food delivery app order,Food
+monthly pantry restock,Food
+fresh fruits and vegetables,Food
+rice and cooking oil purchase,Food
+late night takeaway,Food
+protein shake and oats,Food
+dessert shop purchase,Food
+family restaurant dinner,Food
+workday salad bowl,Food
+ice cream tub,Food
 uber ride,Transport
 metro recharge,Transport
 fuel refill,Transport
 bus ticket,Transport
+auto rickshaw fare,Transport
+cab airport drop,Transport
+train pass renewal,Transport
+toll plaza payment,Transport
+parking fee mall,Transport
+bike service commute,Transport
+intercity bus booking,Transport
+ride share to office,Transport
+local train ticket,Transport
+ev charging station payment,Transport
+car wash before trip,Transport
+highway fuel top up,Transport
+two wheeler puncture repair,Transport
+office shuttle pass,Transport
 movie tickets,Entertainment
 netflix subscription,Entertainment
 concert pass,Entertainment
 gaming recharge,Entertainment
+cricket match tickets,Entertainment
+music streaming subscription,Entertainment
+theme park entry,Entertainment
+bowling night payment,Entertainment
+weekend cinema snacks combo,Entertainment
+board game cafe bill,Entertainment
+bookstore novel purchase,Entertainment
+standup comedy show tickets,Entertainment
+video game purchase online,Entertainment
+amusement arcade credits,Entertainment
+ott annual plan renewal,Entertainment
+karaoke room booking,Entertainment
+festival event pass,Entertainment
+museum entry ticket,Entertainment
 electricity bill,Bills
 water bill,Bills
 internet recharge,Bills
 mobile bill,Bills
+broadband monthly payment,Bills
+gas cylinder refill,Bills
+rent payment,Bills
+home maintenance charge,Bills
+apartment society fees,Bills
+cloud storage subscription,Bills
+software license renewal,Bills
+dth recharge,Bills
+electricity arrears payment,Bills
+wifi router installment,Bills
+sewage and utility charge,Bills
+home insurance premium,Bills
+domain and hosting renewal,Bills
+postpaid phone bill,Bills
 pharmacy medicine,Health
 doctor consultation,Health
 gym membership,Health
 vitamin supplements,Health
+dental checkup,Health
+eye test and glasses,Health
+health insurance premium,Health
+blood test lab charges,Health
+physiotherapy session fee,Health
+first aid supplies,Health
+protein powder refill,Health
+yoga class subscription,Health
+vaccination expense,Health
+skin care treatment,Health
+mental health counseling,Health
+hospital registration fee,Health
+pain relief medicine,Health
+nutritionist consultation,Health
 mall shopping,Shopping
 online order shoes,Shopping
 clothing purchase,Shopping
 gift purchase,Shopping
+home decor items,Shopping
+kitchen appliance purchase,Shopping
+smartphone accessories,Shopping
+festival clothing order,Shopping
+office chair purchase,Shopping
+headphones online order,Shopping
+makeup and cosmetics,Shopping
+school bag purchase,Shopping
+watch strap replacement,Shopping
+blanket and bedsheet set,Shopping
+birthday gift hamper,Shopping
+laptop sleeve purchase,Shopping
+sports shoes sale order,Shopping
+furniture assembly purchase,Shopping
 stationery purchase,Other
 book fair purchase,Other
 charity donation,Other
 misc household item,Other
+pet supplies purchase,Other
+courier charges,Other
+atm cash withdrawal fee,Other
+bank service charge,Other
+document printing,Other
+passport photo expense,Other
+repair toolkit purchase,Other
+holiday travel insurance,Other
+temple donation,Other
+lost item replacement,Other
+key duplication service,Other
+event volunteer contribution,Other
+community fundraiser payment,Other
+small cash adjustment,Other

@@ -227,7 +227,7 @@ These are checked live every time you load the dashboard or reports page.
 | `ModuleNotFoundError: No module named 'flask'` | Your virtual environment is not active. Run `.\.venv\Scripts\Activate.ps1` first |
 | `database.db: no such table` | Delete `database.db` and restart `python app.py` to reinitialize |
 | Charts not showing | Check that JavaScript is enabled in your browser and the server is running |
-| Category prediction always returns `Other` | Delete `models/expense_classifier.joblib` and restart the server to retrain from scratch |
+| Category prediction seems outdated after changing seed data | Restart the app; SmartFin now retrains automatically when `data/seed_transactions.csv` is newer than the saved model |
 | Port 5000 already in use | Stop any other process using port 5000, or change the port in `app.py` to `app.run(port=5001)` |
 
 ---

@@ -3,14 +3,11 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from functools import lru_cache
 
 import pandas as pd
-from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.linear_model import LinearRegression
-from sklearn.naive_bayes import MultinomialNB
-from sklearn.pipeline import Pipeline
 
+from models.expense_model import expense_categorizer
 from utils.database import create_budget_alert_event, fetch_user_category_budgets, get_db_connection
 
 
@@ -278,49 +275,33 @@ def check_overspending(user_id: int) -> list[str]:
     return alerts
 
 
-@lru_cache(maxsize=1)
-def _build_internal_categorizer() -> Pipeline:
-    """Train and cache a lightweight text model for quick expense categorization."""
-    samples: dict[str, str] = {
-        "Starbucks coffee": "Food",
-        "Dominos pizza": "Food",
-        "Swiggy order": "Food",
-        "Uber ride": "Transport",
-        "Ola cab": "Transport",
-        "Metro recharge": "Transport",
-        "Electricity bill": "Bills",
-        "Water bill": "Bills",
-        "Internet recharge": "Bills",
-        "Movie tickets": "Entertainment",
-        "Netflix subscription": "Entertainment",
-        "Pharmacy medicine": "Health",
-        "Doctor consultation": "Health",
-        "Grocery shopping": "Food",
-        "Amazon shopping": "Shopping",
-        "Clothing purchase": "Shopping",
-    }
-
-    texts = list(samples.keys())
-    labels = list(samples.values())
-
-    model = Pipeline(
-        [
-            ("vectorizer", CountVectorizer()),
-            ("classifier", MultinomialNB()),
-        ]
-    )
-    model.fit(texts, labels)
-    return model
-
-
 def auto_categorize(description: str) -> str:
-    """Predict an expense category from free-text description using CountVectorizer + MultinomialNB."""
+    """Predict an expense category from free-text description using the shared ML model."""
     cleaned_description = description.strip()
     if not cleaned_description:
         return "Other"
 
-    model = _build_internal_categorizer()
-    return str(model.predict([cleaned_description])[0])
+    lowered = cleaned_description.casefold()
+    health_keywords = (
+        "medical",
+        "hospital",
+        "clinic",
+        "doctor",
+        "pharmacy",
+        "medicine",
+        "checkup",
+        "dental",
+        "physio",
+        "therapy",
+        "counsel",
+        "vaccin",
+        "lab test",
+        "blood test",
+    )
+    if any(keyword in lowered for keyword in health_keywords):
+        return "Health"
+
+    return expense_categorizer.predict_category(cleaned_description)
 
 
 def predict_monthly_expense(user_id: int) -> dict:
