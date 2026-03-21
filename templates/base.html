@@ -23,6 +23,10 @@
                 <a href="{{ url_for('add_transaction') }}" class="nav-link">Add Transaction</a>
                 <a href="{{ url_for('budgets') }}" class="nav-link">Budgets</a>
                 <a href="{{ url_for('reports') }}" class="nav-link">Reports</a>
+                <button type="button" class="nav-link nav-link-btn" data-open-chat="true">
+                    <span class="nav-icon">AI</span>
+                    <span>SmartFin Chatbot</span>
+                </button>
                 <a href="{{ url_for('logout') }}" class="nav-link danger-link">Logout</a>
             </nav>
         </aside>
@@ -44,8 +48,50 @@
 
             {% block content %}{% endblock %}
         </main>
+
+        {% if session.get('user_id') and request.endpoint not in ['login', 'register'] %}
+        <button
+            type="button"
+            class="chatbot-fab"
+            data-open-chat="true"
+            aria-label="Ask SmartFin Chatbot"
+        >
+            <span class="chatbot-fab-icon" aria-hidden="true"></span>
+            <span>Ask SmartFin Chatbot</span>
+        </button>
+
+        <div class="chatbot-drawer-overlay" id="chatbotDrawerOverlay" data-close-chat="true"></div>
+        <aside class="chatbot-drawer" id="chatbotDrawer" aria-hidden="true" aria-label="SmartFin AI Assistant drawer">
+            <div class="chatbot-drawer-header">
+                <div>
+                    <h2>SmartFin AI Assistant</h2>
+                    <p>Ask finance questions using your own SmartFin data.</p>
+                </div>
+                <button type="button" class="chatbot-close-btn" data-close-chat="true" aria-label="Close chatbot">&times;</button>
+            </div>
+
+            <div class="chatbot-messages" id="chatbotMessages" aria-live="polite">
+                <div class="chatbot-bubble chatbot-ai-message">
+                    Ask me things like: "Where did I overspend this month?" or "Compare this month with last month".
+                </div>
+            </div>
+
+            <form id="chatbotForm" class="chatbot-form">
+                <label for="chatbotInput" class="sr-only">Ask SmartFin AI</label>
+                <textarea
+                    id="chatbotInput"
+                    name="question"
+                    rows="2"
+                    placeholder="Type your question here..."
+                    required
+                ></textarea>
+                <button type="submit" class="primary-btn">Send</button>
+            </form>
+        </aside>
+        {% endif %}
     </div>
     <script src="{{ url_for('static', filename='js/charts.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/chatbot.js') }}"></script>
     <script>
     document.addEventListener('DOMContentLoaded', function () {
         const flashStack = document.getElementById('flashStack');

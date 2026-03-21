@@ -108,21 +108,23 @@
         </div>
     </article>
 
-    <article class="panel chat-panel">
+    <article class="panel ai-assistant-card">
         <div class="panel-heading">
-            <h2>AI Financial Insights Assistant</h2>
-            <p>Ask questions about your own spending, savings, and budget behavior.</p>
+            <h2>AI Financial Assistant</h2>
+            <p>Get fast, contextual guidance from your current SmartFin data.</p>
         </div>
-        <div id="chatMessages" class="chat-messages" aria-live="polite">
-            <div class="chat-bubble chat-ai">
-                Ask me things like: "Where did I overspend this month?" or "Compare this month with last month".
-            </div>
+        <div class="assistant-prompt-list">
+            <button type="button" class="assistant-prompt-btn" data-open-chat="true" data-chat-prompt="Where did I overspend this month?">
+                Where did I overspend this month?
+            </button>
+            <button type="button" class="assistant-prompt-btn" data-open-chat="true" data-chat-prompt="Compare this month with last month">
+                Compare this month with last month
+            </button>
+            <button type="button" class="assistant-prompt-btn" data-open-chat="true" data-chat-prompt="How can I save more?">
+                How can I save more?
+            </button>
         </div>
-        <form id="aiChatForm" class="chat-form">
-            <label for="aiQuestion" class="sr-only">Ask SmartFin AI</label>
-            <textarea id="aiQuestion" name="question" rows="2" placeholder="Ask a finance question based on your transactions..." required></textarea>
-            <button type="submit" class="primary-btn">Ask AI</button>
-        </form>
+        <button type="button" class="secondary-btn assistant-open-btn" data-open-chat="true">Open Chat</button>
     </article>
 
     <article class="panel">
@@ -184,57 +186,4 @@
         </div>
     </article>
 </section>
-{% endblock %}
-
-{% block scripts %}
-<script>
-document.addEventListener('DOMContentLoaded', function () {
-    const form = document.getElementById('aiChatForm');
-    const input = document.getElementById('aiQuestion');
-    const messages = document.getElementById('chatMessages');
-
-    if (!form || !input || !messages) {
-        return;
-    }
-
-    function appendMessage(text, type) {
-        const bubble = document.createElement('div');
-        bubble.className = 'chat-bubble ' + (type === 'user' ? 'chat-user' : 'chat-ai');
-        bubble.textContent = text;
-        messages.appendChild(bubble);
-        messages.scrollTop = messages.scrollHeight;
-    }
-
-    form.addEventListener('submit', async function (event) {
-        event.preventDefault();
-        const question = input.value.trim();
-        if (!question) {
-            return;
-        }
-
-        appendMessage(question, 'user');
-        input.value = '';
-
-        try {
-            const response = await fetch('/ai-chat', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ question: question }),
-            });
-
-            if (!response.ok) {
-                throw new Error('Unable to get AI response');
-            }
-
-            const payload = await response.json();
-            const source = payload.source === 'llm' ? 'AI model' : 'local analysis';
-            appendMessage(payload.answer + ' (' + source + ')', 'ai');
-        } catch (error) {
-            appendMessage('I could not process that right now. Please try again in a few seconds.', 'ai');
-        }
-    });
-});
-</script>
 {% endblock %}
