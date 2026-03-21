@@ -154,11 +154,22 @@ The dashboard shows:
 - **Predicted Next Month Expense** – Linear Regression estimate
 - **Overspending Alert** – triggered when expenses exceed 80% of income
 - **AI Suggestions** – dynamic Pandas-based recommendations
+- **Personalized Saving Suggestions** – severity-based insight cards from real spending behavior
+- **AI Financial Insights Assistant** – chat panel that answers questions using your own transaction context
 - **Explainability Snapshot** – short notes on how each ML feature works
 - **Charts** – Doughnut (categories), Line (monthly trend), Bar (savings vs expenses)
 - **Recent Transactions** – your 5 latest entries
 
 Charts load automatically from the `/api/chart_data` endpoint and require JavaScript to be enabled.
+
+You can ask the AI assistant questions such as:
+
+- `Where did I overspend this month?`
+- `How can I save more?`
+- `Summarize my March spending`
+- `Compare this month with last month`
+
+If no LLM API is configured, SmartFin automatically responds using local Pandas + rule-based analysis.
 
 ---
 

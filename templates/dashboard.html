@@ -90,6 +90,43 @@
 
     <article class="panel">
         <div class="panel-heading">
+            <h2>Personalized Saving Suggestions</h2>
+            <p>Priority insights generated from your own monthly transaction patterns.</p>
+        </div>
+        <div class="insight-card-list">
+            {% for item in personalized_suggestions %}
+            <article class="insight-card insight-{{ item.type }}">
+                <h3>{{ item.title }}</h3>
+                <p>{{ item.message }}</p>
+            </article>
+            {% else %}
+            <article class="insight-card insight-info">
+                <h3>No Suggestions Yet</h3>
+                <p>Add more transactions to unlock personalized savings guidance.</p>
+            </article>
+            {% endfor %}
+        </div>
+    </article>
+
+    <article class="panel chat-panel">
+        <div class="panel-heading">
+            <h2>AI Financial Insights Assistant</h2>
+            <p>Ask questions about your own spending, savings, and budget behavior.</p>
+        </div>
+        <div id="chatMessages" class="chat-messages" aria-live="polite">
+            <div class="chat-bubble chat-ai">
+                Ask me things like: "Where did I overspend this month?" or "Compare this month with last month".
+            </div>
+        </div>
+        <form id="aiChatForm" class="chat-form">
+            <label for="aiQuestion" class="sr-only">Ask SmartFin AI</label>
+            <textarea id="aiQuestion" name="question" rows="2" placeholder="Ask a finance question based on your transactions..." required></textarea>
+            <button type="submit" class="primary-btn">Ask AI</button>
+        </form>
+    </article>
+
+    <article class="panel">
+        <div class="panel-heading">
             <h2>AI Suggestions</h2>
             <p>Dynamic recommendations from transaction analysis.</p>
         </div>
@@ -147,4 +184,57 @@
         </div>
     </article>
 </section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const form = document.getElementById('aiChatForm');
+    const input = document.getElementById('aiQuestion');
+    const messages = document.getElementById('chatMessages');
+
+    if (!form || !input || !messages) {
+        return;
+    }
+
+    function appendMessage(text, type) {
+        const bubble = document.createElement('div');
+        bubble.className = 'chat-bubble ' + (type === 'user' ? 'chat-user' : 'chat-ai');
+        bubble.textContent = text;
+        messages.appendChild(bubble);
+        messages.scrollTop = messages.scrollHeight;
+    }
+
+    form.addEventListener('submit', async function (event) {
+        event.preventDefault();
+        const question = input.value.trim();
+        if (!question) {
+            return;
+        }
+
+        appendMessage(question, 'user');
+        input.value = '';
+
+        try {
+            const response = await fetch('/ai-chat', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ question: question }),
+            });
+
+            if (!response.ok) {
+                throw new Error('Unable to get AI response');
+            }
+
+            const payload = await response.json();
+            const source = payload.source === 'llm' ? 'AI model' : 'local analysis';
+            appendMessage(payload.answer + ' (' + source + ')', 'ai');
+        } catch (error) {
+            appendMessage('I could not process that right now. Please try again in a few seconds.', 'ai');
+        }
+    });
+});
+</script>
 {% endblock %}

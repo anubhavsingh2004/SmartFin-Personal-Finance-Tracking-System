@@ -584,6 +584,112 @@ textarea {
     line-height: 1.6;
 }
 
+.insight-card-list {
+    display: grid;
+    gap: 12px;
+}
+
+.insight-card {
+    border-radius: 16px;
+    padding: 14px 16px;
+    border: 1px solid var(--border);
+}
+
+.insight-card h3 {
+    margin: 0 0 6px;
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 1rem;
+}
+
+.insight-card p {
+    margin: 0;
+    color: var(--muted);
+    line-height: 1.55;
+}
+
+.insight-danger {
+    background: rgba(208, 84, 84, 0.11);
+    border-color: rgba(208, 84, 84, 0.25);
+}
+
+.insight-warning {
+    background: rgba(217, 148, 40, 0.11);
+    border-color: rgba(217, 148, 40, 0.28);
+}
+
+.insight-info {
+    background: rgba(12, 138, 158, 0.1);
+    border-color: rgba(12, 138, 158, 0.22);
+}
+
+.insight-success {
+    background: rgba(30, 159, 112, 0.11);
+    border-color: rgba(30, 159, 112, 0.24);
+}
+
+.chat-messages {
+    min-height: 180px;
+    max-height: 320px;
+    overflow-y: auto;
+    display: grid;
+    gap: 10px;
+    padding: 12px;
+    margin-bottom: 12px;
+    border-radius: 16px;
+    border: 1px solid rgba(22, 51, 59, 0.12);
+    background: rgba(255, 255, 255, 0.72);
+}
+
+.chat-panel {
+    display: flex;
+    flex-direction: column;
+}
+
+.chat-panel .chat-messages {
+    flex: 1;
+}
+
+.chat-bubble {
+    max-width: 90%;
+    padding: 10px 12px;
+    border-radius: 12px;
+    line-height: 1.5;
+    word-wrap: break-word;
+}
+
+.chat-ai {
+    justify-self: start;
+    background: rgba(12, 138, 158, 0.12);
+    border: 1px solid rgba(12, 138, 158, 0.2);
+}
+
+.chat-user {
+    justify-self: end;
+    background: rgba(22, 51, 59, 0.1);
+    border: 1px solid rgba(22, 51, 59, 0.18);
+}
+
+.chat-form {
+    display: grid;
+    gap: 10px;
+}
+
+.chat-form textarea {
+    min-height: 72px;
+}
+
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
 .note-grid {
     display: grid;
     gap: 14px;

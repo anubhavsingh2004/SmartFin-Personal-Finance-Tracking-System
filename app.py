@@ -27,6 +27,7 @@ from utils.database import (
     seed_user_budgets,
     update_user_category_budgets,
 )
+from utils.ai_insights import generate_ai_response, generate_personalized_suggestions
 from utils.ml_utils import (
     auto_categorize,
     build_chart_payload,
@@ -345,6 +346,7 @@ def dashboard():
     summary = calculate_summary(transactions)
     overspending_alerts = check_overspending(user_id)
     suggestions = get_ai_suggestions(user_id)
+    personalized_suggestions = generate_personalized_suggestions(user_id)
     prediction = predict_monthly_expense(user_id)
     budget_alerts = check_budget_threshold_alerts(user_id)
     recent_transactions = transactions[:5]
@@ -367,6 +369,7 @@ def dashboard():
         summary=summary,
         overspending=overspending,
         suggestions=suggestions,
+        personalized_suggestions=personalized_suggestions,
         prediction=prediction,
         budget_alerts=budget_alerts,
         recent_transactions=recent_transactions,
@@ -797,6 +800,15 @@ def chart_data():
 def get_transactions():
     user_id = int(session["user_id"])
     return jsonify(fetch_user_transactions(user_id))
+
+
+@app.route("/ai-chat", methods=["POST"])
+@login_required
+def ai_chat():
+    payload = request.get_json(silent=True) or {}
+    question = str(payload.get("question", "")).strip()
+    response = generate_ai_response(int(session["user_id"]), question)
+    return jsonify(response)
 
 
 def bootstrap() -> None:

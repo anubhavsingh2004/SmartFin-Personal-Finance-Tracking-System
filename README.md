@@ -118,6 +118,8 @@ SQLite stores users and transactions. Dates are stored in `YYYY-MM-DD` format to
 - Overspending alert section
 - Budget threshold notification section
 - AI financial suggestion section
+- Personalized saving suggestion cards (severity-prioritized)
+- AI chat panel for finance Q&A grounded in user transactions
 - Recent transactions table
 
 ### Budget Management
@@ -172,6 +174,20 @@ Suggestions are generated dynamically from user data, for example:
 - If savings are below 20% of income
 - If a category consumes more than 30% of income
 - If monthly expenses increase by more than 40%
+
+#### AI Financial Insights Chat
+- Endpoint: `POST /ai-chat`
+- Uses transaction-grounded context from:
+  - total income, expenses, and balance
+  - top categories and monthly trend
+  - category month-over-month increases
+  - overspending and budget usage alerts
+- Integrates with an external LLM through a provider-agnostic placeholder
+- Falls back to local Pandas/rule-based replies when LLM is unavailable
+
+Implementation files:
+- `utils/ai_insights.py`
+- `templates/dashboard.html` (chat panel UI)
 
 ## Chart Visualizations
 
@@ -269,6 +285,16 @@ Set the following environment variables to enable budget threshold emails:
 - `SMARTFIN_SMTP_PASSWORD`
 - `SMARTFIN_SMTP_USE_TLS` (`true` or `false`, default: `true`)
 - `SMARTFIN_EMAIL_FROM`
+
+## Optional LLM Configuration (For AI Chat)
+
+The chat feature works without any API key using local fallback logic.
+To connect Gemini/OpenRouter later, configure:
+
+- `SMARTFIN_LLM_ENDPOINT`
+- `SMARTFIN_LLM_API_KEY`
+
+`utils/ai_insights.py` contains `call_llm_api(prompt)` as the integration placeholder.
 
 Example PowerShell setup:
 
