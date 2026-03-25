@@ -14,7 +14,30 @@ async function loadChartData() {
     }
 
     try {
-        const response = await fetch('/api/chart_data');
+        let endpoint = '/api/chart_data';
+        const reportContext = document.getElementById('reportChartContext');
+        if (reportContext) {
+            const params = new URLSearchParams();
+            const reportType = reportContext.dataset.reportType || '';
+            const month = reportContext.dataset.month || '';
+            const year = reportContext.dataset.year || '';
+
+            if (reportType) {
+                params.set('report_type', reportType);
+            }
+            if (month) {
+                params.set('month', month);
+            }
+            if (year) {
+                params.set('year', year);
+            }
+
+            if (params.toString()) {
+                endpoint = endpoint + '?' + params.toString();
+            }
+        }
+
+        const response = await fetch(endpoint);
         if (!response.ok) {
             throw new Error('Failed to load chart data');
         }

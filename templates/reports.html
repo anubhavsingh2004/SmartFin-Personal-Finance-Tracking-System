@@ -13,52 +13,82 @@
 
 <section class="panel report-actions-panel">
     <div class="panel-heading">
-        <h2>Monthly Report Actions</h2>
-        <p>Pick a month to download the report or send it to your registered email.</p>
+        <h2>Report Actions</h2>
+        <p>Select monthly or yearly mode, then download the report or send it to your registered email.</p>
     </div>
     <div class="report-actions-grid">
         <form method="get" action="{{ url_for('reports') }}" class="report-filter-form">
             <label>
-                Report Month
-                <input type="month" name="month" value="{{ selected_month }}" required>
+                Report Type
+                <select name="report_type" id="reportTypeSelect" required>
+                    <option value="monthly" {% if report_type == 'monthly' %}selected{% endif %}>Monthly Report</option>
+                    <option value="yearly" {% if report_type == 'yearly' %}selected{% endif %}>Yearly Report</option>
+                </select>
             </label>
-            <button type="submit" class="secondary-btn">Load Month</button>
+
+            <label id="reportMonthField">
+                Report Month
+                <input type="month" name="month" id="reportMonthInput" value="{{ selected_month }}" {% if report_type != 'monthly' %}disabled{% endif %}>
+            </label>
+
+            <label id="reportYearField">
+                Report Year
+                <input type="number" name="year" id="reportYearInput" value="{{ selected_year }}" min="2000" max="{{ current_year + 5 }}" step="1" {% if report_type != 'yearly' %}disabled{% endif %}>
+            </label>
+
+            <button type="submit" class="secondary-btn">Load Report</button>
         </form>
 
-        <a href="{{ url_for('download_monthly_report', month=selected_month) }}" class="primary-btn">Download Monthly CSV</a>
+        <a
+            href="{{ url_for('export_report', report_type=report_type, month=selected_month, year=selected_year) }}"
+            data-base-url="{{ url_for('export_report') }}"
+            id="exportReportLink"
+            class="primary-btn"
+        >
+            Download {{ report_type.title() }} CSV
+        </a>
 
-        <form method="post" action="{{ url_for('email_monthly_report') }}" id="emailMonthlyForm">
-            <input type="hidden" name="month" value="{{ selected_month }}">
-            <button type="submit" class="secondary-btn" id="emailBtn" data-cooldown-ms="10000">Email Monthly Report</button>
+        <form method="post" action="{{ url_for('send_email_report') }}" id="emailMonthlyForm">
+            <input type="hidden" name="report_type" value="{{ report_type }}" id="emailReportTypeInput">
+            <input type="hidden" name="month" value="{{ selected_month }}" id="emailReportMonthInput">
+            <input type="hidden" name="year" value="{{ selected_year }}" id="emailReportYearInput">
+            <button type="submit" class="secondary-btn" id="emailBtn" data-cooldown-ms="10000">Email {{ report_type.title() }} Report</button>
             <span id="emailCooldownMessage" class="inline-cooldown-message" aria-live="polite"></span>
         </form>
     </div>
     <div class="monthly-snapshot-grid">
         <div class="note-card">
-            <strong>Selected Month</strong>
-            <p>{{ selected_month }}</p>
+            <strong>Selected Period</strong>
+            <p>{{ selected_period_label }}</p>
         </div>
         <div class="note-card">
             <strong>Transactions</strong>
             <p>{{ monthly_transaction_count }}</p>
         </div>
         <div class="note-card">
-            <strong>Monthly Income</strong>
+            <strong>Total Income</strong>
             <p>Rs. {{ '%.2f'|format(monthly_summary.total_income) }}</p>
         </div>
         <div class="note-card">
-            <strong>Monthly Expenses</strong>
+            <strong>Total Expenses</strong>
             <p>Rs. {{ '%.2f'|format(monthly_summary.total_expenses) }}</p>
         </div>
         <div class="note-card">
-            <strong>Monthly Balance</strong>
+            <strong>Balance</strong>
             <p>Rs. {{ '%.2f'|format(monthly_summary.balance) }}</p>
         </div>
         <div class="note-card">
-            <strong>Monthly Savings Rate</strong>
+            <strong>Savings Rate</strong>
             <p>{{ '%.2f'|format(monthly_summary.savings_rate) }}%</p>
         </div>
     </div>
+
+    {% if no_data_message %}
+    <section class="alert-banner warning-banner">
+        <strong>No Data Found</strong>
+        <p>{{ no_data_message }}</p>
+    </section>
+    {% endif %}
 </section>
 
 <section class="stats-grid compact-grid">
@@ -130,10 +160,12 @@
 {% endif %}
 
 <section class="dashboard-grid">
+    <div id="reportChartContext" data-report-type="{{ report_type }}" data-month="{{ selected_month }}" data-year="{{ selected_year }}" hidden></div>
+
     <article class="panel chart-panel">
         <div class="panel-heading">
             <h2>Category Breakdown</h2>
-            <p>Chart view of expenses grouped by category.</p>
+            <p>Chart view of expenses grouped by category for the selected report period.</p>
         </div>
         <canvas id="expenseCategoryChart"></canvas>
     </article>
@@ -141,7 +173,7 @@
     <article class="panel chart-panel">
         <div class="panel-heading">
             <h2>Monthly Trend</h2>
-            <p>Track how monthly expenses are changing.</p>
+            <p>Yearly mode shows month-wise expense trend. Monthly mode shows the selected period context.</p>
         </div>
         <canvas id="monthlyTrendChart"></canvas>
     </article>
@@ -218,12 +250,90 @@
 {% block scripts %}
 <script>
 document.addEventListener('DOMContentLoaded', function () {
+    const reportTypeSelect = document.getElementById('reportTypeSelect');
+    const reportMonthField = document.getElementById('reportMonthField');
+    const reportYearField = document.getElementById('reportYearField');
+    const reportMonthInput = document.getElementById('reportMonthInput');
+    const reportYearInput = document.getElementById('reportYearInput');
+    const exportReportLink = document.getElementById('exportReportLink');
+    const emailReportTypeInput = document.getElementById('emailReportTypeInput');
+    const emailReportMonthInput = document.getElementById('emailReportMonthInput');
+    const emailReportYearInput = document.getElementById('emailReportYearInput');
     const emailButton = document.getElementById('emailBtn');
+
+    function getState() {
+        const reportType = reportTypeSelect ? reportTypeSelect.value : 'monthly';
+        const month = reportMonthInput && reportMonthInput.value ? reportMonthInput.value : '{{ selected_month }}';
+        const year = reportYearInput && reportYearInput.value ? reportYearInput.value : '{{ selected_year }}';
+        return { reportType, month, year };
+    }
+
+    function syncActionTargets() {
+        const state = getState();
+
+        if (emailReportTypeInput) {
+            emailReportTypeInput.value = state.reportType;
+        }
+        if (emailReportMonthInput) {
+            emailReportMonthInput.value = state.month;
+        }
+        if (emailReportYearInput) {
+            emailReportYearInput.value = state.year;
+        }
+
+        if (exportReportLink) {
+            const baseUrl = exportReportLink.dataset.baseUrl || exportReportLink.getAttribute('href');
+            const params = new URLSearchParams({
+                report_type: state.reportType,
+                month: state.month,
+                year: state.year,
+            });
+            exportReportLink.setAttribute('href', baseUrl + '?' + params.toString());
+            exportReportLink.textContent = 'Download ' + state.reportType.charAt(0).toUpperCase() + state.reportType.slice(1) + ' CSV';
+        }
+
+        if (emailButton) {
+            emailButton.textContent = 'Email ' + state.reportType.charAt(0).toUpperCase() + state.reportType.slice(1) + ' Report';
+        }
+    }
+
+    function applyReportTypeVisibility() {
+        if (!reportTypeSelect || !reportMonthInput || !reportYearInput || !reportMonthField || !reportYearField) {
+            return;
+        }
+
+        const isYearly = reportTypeSelect.value === 'yearly';
+        reportMonthInput.disabled = isYearly;
+        reportMonthInput.required = !isYearly;
+        reportMonthField.style.display = isYearly ? 'none' : '';
+
+        reportYearInput.disabled = !isYearly;
+        reportYearInput.required = isYearly;
+        reportYearField.style.display = isYearly ? '' : 'none';
+
+        syncActionTargets();
+    }
+
+    if (reportTypeSelect) {
+        reportTypeSelect.addEventListener('change', applyReportTypeVisibility);
+    }
+
+    if (reportMonthInput) {
+        reportMonthInput.addEventListener('change', syncActionTargets);
+    }
+
+    if (reportYearInput) {
+        reportYearInput.addEventListener('change', syncActionTargets);
+    }
+
     const emailForm = document.getElementById('emailMonthlyForm');
     const cooldownMessage = document.getElementById('emailCooldownMessage');
     if (!emailButton || !emailForm || !cooldownMessage) {
         return;
     }
+
+    applyReportTypeVisibility();
+    syncActionTargets();
 
     const storageKey = 'smartfinEmailCooldownUntil';
     const cooldown = Number(emailButton.dataset.cooldownMs || '10000');

@@ -6,6 +6,7 @@ import os
 import csv
 import smtplib
 import time
+import re
 from threading import Lock
 from io import BytesIO, StringIO
 from datetime import datetime
@@ -118,26 +119,121 @@ def resolve_report_month(raw_month: str | None) -> str:
     return month_value
 
 
+def format_month_year(month_value: str) -> str:
+    """Convert YYYY-MM into Mon-YYYY (example: 2026-03 -> Mar-2026)."""
+    try:
+        parsed = datetime.strptime(month_value, "%Y-%m")
+    except ValueError:
+        return month_value
+    return parsed.strftime("%b-%Y")
+
+
+def resolve_report_year(raw_year: str | None) -> str:
+    """Normalize report year input to YYYY, defaulting to current year."""
+    year_value = (raw_year or "").strip()
+    if not year_value:
+        return datetime.today().strftime("%Y")
+
+    if not re.fullmatch(r"\d{4}", year_value):
+        return datetime.today().strftime("%Y")
+
+    try:
+        datetime.strptime(year_value, "%Y")
+    except ValueError:
+        return datetime.today().strftime("%Y")
+
+    return year_value
+
+
+def resolve_report_type(raw_report_type: str | None) -> str:
+    """Return a supported report type value."""
+    report_type = (raw_report_type or "monthly").strip().lower()
+    return "yearly" if report_type == "yearly" else "monthly"
+
+
+def available_report_years(transactions: list[dict]) -> list[str]:
+    """Return available years from transactions plus current year, newest first."""
+    years = {datetime.today().strftime("%Y")}
+    for item in transactions:
+        date_value = str(item.get("date", ""))
+        if len(date_value) >= 4 and date_value[:4].isdigit():
+            years.add(date_value[:4])
+    return sorted(years, reverse=True)
+
+
 def filter_transactions_by_month(transactions: list[dict], month: str) -> list[dict]:
     """Return only transactions whose date falls in the provided YYYY-MM month."""
     month_prefix = f"{month}-"
     return [item for item in transactions if str(item.get("date", "")).startswith(month_prefix)]
 
 
-def build_monthly_report_csv(
+def filter_transactions_by_year(transactions: list[dict], year: str) -> list[dict]:
+    """Return only transactions whose date falls in the provided YYYY year."""
+    year_prefix = f"{year}-"
+    return [item for item in transactions if str(item.get("date", "")).startswith(year_prefix)]
+
+
+def build_category_breakdown(transactions: list[dict]) -> list[dict]:
+    """Aggregate expense totals by category, sorted descending by amount."""
+    totals: dict[str, float] = {}
+    for transaction in transactions:
+        if str(transaction.get("type", "")) != "Expense":
+            continue
+        category = str(transaction.get("category", "Other")) or "Other"
+        amount = float(transaction.get("amount", 0.0) or 0.0)
+        totals[category] = totals.get(category, 0.0) + amount
+
+    return [
+        {"category": category, "amount": round(amount, 2)}
+        for category, amount in sorted(totals.items(), key=lambda item: item[1], reverse=True)
+    ]
+
+
+def build_yearly_monthly_trend(transactions: list[dict], year: str) -> list[dict]:
+    """Build expense trend for all months in a selected year."""
+    monthly_totals = {index: 0.0 for index in range(1, 13)}
+
+    for transaction in transactions:
+        if str(transaction.get("type", "")) != "Expense":
+            continue
+        date_value = str(transaction.get("date", ""))
+        try:
+            parsed_date = datetime.strptime(date_value, "%Y-%m-%d")
+        except ValueError:
+            continue
+        if parsed_date.strftime("%Y") != year:
+            continue
+
+        monthly_totals[parsed_date.month] += float(transaction.get("amount", 0.0) or 0.0)
+
+    return [
+        {
+            "month": datetime(int(year), month_number, 1).strftime("%b"),
+            "amount": round(monthly_totals[month_number], 2),
+        }
+        for month_number in range(1, 13)
+    ]
+
+
+def build_report_csv(
     user_name: str,
-    month: str,
+    report_type: str,
+    period_label: str,
     summary: dict,
     transactions: list[dict],
     suggestions: list[str],
+    category_breakdown: list[dict],
+    monthly_trend: list[dict],
 ) -> str:
-    """Create monthly report CSV content with summary and transaction details."""
+    """Create report CSV content for monthly or yearly periods."""
     output = StringIO(newline="")
     writer = csv.writer(output)
 
-    writer.writerow(["SmartFin Monthly Report"])
+    writer.writerow(["SmartFin Financial Report"])
     writer.writerow(["User", user_name])
-    writer.writerow(["Month", month])
+    writer.writerow(["Report Type", report_type.title()])
+    writer.writerow(["Period", period_label])
+    writer.writerow(["Title", f"Financial Report - {period_label}"])
     writer.writerow([])
 
     writer.writerow(["Summary"])
@@ -152,8 +248,24 @@ def build_monthly_report_csv(
         for suggestion in suggestions:
             writer.writerow([suggestion])
     else:
-        writer.writerow(["No suggestions available for this month."])
+        writer.writerow([f"No suggestions available for this {report_type} period."])
     writer.writerow([])
+
+    writer.writerow(["Category-wise Breakdown"])
+    writer.writerow(["Category", "Total Expense"])
+    if category_breakdown:
+        for item in category_breakdown:
+            writer.writerow([item["category"], f"{float(item['amount']):.2f}"])
+    else:
+        writer.writerow(["No expense categories available", "0.00"])
+    writer.writerow([])
+
+    if report_type == "yearly":
+        writer.writerow(["Monthly Trend (Expenses)"])
+        writer.writerow(["Month", "Amount"])
+        for item in monthly_trend:
+            writer.writerow([item["month"], f"{float(item['amount']):.2f}"])
+        writer.writerow([])
 
     writer.writerow(["Transactions"])
     writer.writerow(["Date", "Description", "Category", "Type", "Amount"])
@@ -169,9 +281,57 @@ def build_monthly_report_csv(
         )
 
     if not transactions:
-        writer.writerow(["-", "No transactions available for this month", "-", "-", "0.00"])
+        writer.writerow(["-", f"No transactions available for this {report_type} report", "-", "-", "0.00"])
 
     return output.getvalue()
+
+
+def generate_report(
+    user_name: str,
+    transactions: list[dict],
+    report_type: str,
+    selected_month: str,
+    selected_year: str,
+) -> dict:
+    """Build shared report data used by UI, export, and email flows."""
+    if report_type == "yearly":
+        scoped_transactions = filter_transactions_by_year(transactions, selected_year)
+        period_label = selected_year
+        file_period_label = selected_year
+        monthly_trend = build_yearly_monthly_trend(scoped_transactions, selected_year)
+    else:
+        scoped_transactions = filter_transactions_by_month(transactions, selected_month)
+        period_label = format_month_year(selected_month)
+        file_period_label = period_label
+        monthly_trend = []
+
+    scoped_summary = calculate_summary(scoped_transactions)
+    suggestions = generate_financial_suggestions(scoped_transactions)
+    category_breakdown = build_category_breakdown(scoped_transactions)
+    csv_content = build_report_csv(
+        user_name=user_name,
+        report_type=report_type,
+        period_label=period_label,
+        summary=scoped_summary,
+        transactions=scoped_transactions,
+        suggestions=suggestions,
+        category_breakdown=category_breakdown,
+        monthly_trend=monthly_trend,
+    )
+
+    filename = f"smartfin-{report_type}-report-{file_period_label.lower()}.csv"
+    return {
+        "report_type": report_type,
+        "period_label": period_label,
+        "summary": scoped_summary,
+        "transactions": scoped_transactions,
+        "suggestions": suggestions,
+        "category_breakdown": category_breakdown,
+        "monthly_trend": monthly_trend,
+        "csv_content": csv_content,
+        "filename": filename,
+        "title": f"Financial Report - {period_label}",
+    }
 
 
 def _smtp_config() -> dict:
@@ -227,16 +387,16 @@ def send_budget_alert_email(user_profile: dict, event: dict) -> bool:
         return False
 
 
-def send_monthly_report_email(user_profile: dict, month: str, report_csv: str, summary: dict) -> bool:
-    """Email a monthly CSV report to the current user."""
+def send_report_email(user_profile: dict, report_type: str, period_label: str, report_csv: str, summary: dict) -> bool:
+    """Email a monthly/yearly CSV report to the current user."""
     config = _smtp_config()
     if not _is_email_configured() or not user_profile.get("email"):
         return False
 
-    subject = f"SmartFin Monthly Report - {month}"
+    subject = f"SmartFin {report_type.title()} Report - {period_label}"
     body = (
         f"Hi {user_profile.get('name', 'User')},\n\n"
-        f"Your SmartFin monthly report for {month} is attached.\n\n"
+        f"Your SmartFin {report_type} report for {period_label} is attached.\n\n"
         f"Summary:\n"
         f"- Total Income: Rs. {summary['total_income']:.2f}\n"
         f"- Total Expenses: Rs. {summary['total_expenses']:.2f}\n"
@@ -250,11 +410,12 @@ def send_monthly_report_email(user_profile: dict, month: str, report_csv: str, s
     message["From"] = config["from_email"]
     message["To"] = user_profile["email"]
     message.set_content(body)
+    period_slug = period_label.replace(" ", "-").lower()
     message.add_attachment(
         report_csv.encode("utf-8"),
         maintype="text",
         subtype="csv",
-        filename=f"smartfin-monthly-report-{month}.csv",
+        filename=f"smartfin-{report_type}-report-{period_slug}.csv",
     )
 
     try:
@@ -269,7 +430,7 @@ def send_monthly_report_email(user_profile: dict, month: str, report_csv: str, s
         return False
 
 
-def can_send_monthly_report_email(user_id: int, cooldown_seconds: int = EMAIL_REPORT_COOLDOWN_SECONDS) -> tuple[bool, int]:
+def can_send_report_email(user_id: int, cooldown_seconds: int = EMAIL_REPORT_COOLDOWN_SECONDS) -> tuple[bool, int]:
     """Return whether user can send now and remaining cooldown seconds if blocked."""
     now = time.monotonic()
     with _email_report_cooldown_lock:
@@ -282,6 +443,11 @@ def can_send_monthly_report_email(user_id: int, cooldown_seconds: int = EMAIL_RE
 
         _email_report_cooldowns[user_id] = now
         return True, 0
+
+
+def can_send_monthly_report_email(user_id: int, cooldown_seconds: int = EMAIL_REPORT_COOLDOWN_SECONDS) -> tuple[bool, int]:
+    """Backward-compatible wrapper for monthly email cooldown checks."""
+    return can_send_report_email(user_id, cooldown_seconds)
 
 
 def process_budget_notifications(user_id: int) -> list[dict]:
@@ -639,11 +805,18 @@ def delete_transaction(transaction_id: int):
 @login_required
 def reports():
     user_id = int(session["user_id"])
+    report_type = resolve_report_type(request.args.get("report_type"))
     selected_month = resolve_report_month(request.args.get("month"))
+    selected_year = resolve_report_year(request.args.get("year"))
     transactions = fetch_user_transactions(user_id)
-    monthly_transactions = filter_transactions_by_month(transactions, selected_month)
-    monthly_summary = calculate_summary(monthly_transactions)
-    summary = calculate_summary(transactions)
+    report = generate_report(
+        user_name=session.get("user_name", "User"),
+        transactions=transactions,
+        report_type=report_type,
+        selected_month=selected_month,
+        selected_year=selected_year,
+    )
+    summary = report["summary"]
     suggestions = get_ai_suggestions(user_id)
     prediction = predict_monthly_expense(user_id)
     overspending_alerts = check_overspending(user_id)
@@ -664,86 +837,118 @@ def reports():
         "reports.html",
         summary=summary,
         suggestions=suggestions,
+        report_suggestions=report["suggestions"],
         overspending=overspending,
         prediction=prediction,
         overspending_alerts=overspending_alerts,
         budget_alerts=budget_alerts,
-        transactions=transactions[:15],
+        transactions=report["transactions"][:15],
         model_notes=build_model_notes(prediction, overspending),
+        report_type=report_type,
         selected_month=selected_month,
-        monthly_summary=monthly_summary,
-        monthly_transaction_count=len(monthly_transactions),
+        selected_year=selected_year,
+        selected_period_label=report["period_label"],
+        available_years=available_report_years(transactions),
+        current_year=datetime.today().year,
+        monthly_summary=report["summary"],
+        monthly_transaction_count=len(report["transactions"]),
+        category_breakdown=report["category_breakdown"],
+        yearly_monthly_trend=report["monthly_trend"],
+        no_data_message=(
+            f"No transactions found for {report['period_label']}. Try selecting a different period."
+            if not report["transactions"]
+            else ""
+        ),
+    )
+
+
+@app.route("/reports/export")
+@login_required
+def export_report():
+    user_id = int(session["user_id"])
+    report_type = resolve_report_type(request.args.get("report_type"))
+    selected_month = resolve_report_month(request.args.get("month"))
+    selected_year = resolve_report_year(request.args.get("year"))
+
+    transactions = fetch_user_transactions(user_id)
+    report = generate_report(
+        user_name=session.get("user_name", "User"),
+        transactions=transactions,
+        report_type=report_type,
+        selected_month=selected_month,
+        selected_year=selected_year,
+    )
+
+    if not report["transactions"]:
+        flash(f"No transactions found for {report['period_label']}.", "info")
+        return redirect(url_for("reports", report_type=report_type, month=selected_month, year=selected_year))
+
+    return send_file(
+        BytesIO(report["csv_content"].encode("utf-8")),
+        mimetype="text/csv",
+        as_attachment=True,
+        download_name=report["filename"],
     )
 
 
 @app.route("/reports/monthly/download")
 @login_required
 def download_monthly_report():
-    user_id = int(session["user_id"])
     selected_month = resolve_report_month(request.args.get("month"))
+    return redirect(url_for("export_report", report_type="monthly", month=selected_month))
+
+
+@app.route("/reports/email", methods=["POST"])
+@login_required
+def send_email_report():
+    user_id = int(session["user_id"])
+    report_type = resolve_report_type(request.form.get("report_type"))
+    selected_month = resolve_report_month(request.form.get("month"))
+    selected_year = resolve_report_year(request.form.get("year"))
+    user_profile = fetch_user_profile(user_id)
+
+    if user_profile is None or not user_profile.get("email"):
+        flash("No email address found for your account.", "danger")
+        return redirect(url_for("reports", report_type=report_type, month=selected_month, year=selected_year))
+
+    if not _is_email_configured():
+        flash("Report email is disabled. Configure SMARTFIN_SMTP_* and SMARTFIN_EMAIL_FROM to enable it.", "info")
+        return redirect(url_for("reports", report_type=report_type, month=selected_month, year=selected_year))
+
+    can_send, remaining_seconds = can_send_report_email(user_id)
+    if not can_send:
+        flash(f"Please wait {remaining_seconds} seconds before sending another report email.", "warning")
+        return redirect(url_for("reports", report_type=report_type, month=selected_month, year=selected_year))
 
     transactions = fetch_user_transactions(user_id)
-    monthly_transactions = filter_transactions_by_month(transactions, selected_month)
-    monthly_summary = calculate_summary(monthly_transactions)
-    suggestions = generate_financial_suggestions(monthly_transactions)
-
-    report_csv = build_monthly_report_csv(
-        user_name=session.get("user_name", "User"),
-        month=selected_month,
-        summary=monthly_summary,
-        transactions=monthly_transactions,
-        suggestions=suggestions,
+    report = generate_report(
+        user_name=user_profile.get("name", "User"),
+        transactions=transactions,
+        report_type=report_type,
+        selected_month=selected_month,
+        selected_year=selected_year,
     )
 
-    filename = f"smartfin-monthly-report-{selected_month}.csv"
-    return send_file(
-        BytesIO(report_csv.encode("utf-8")),
-        mimetype="text/csv",
-        as_attachment=True,
-        download_name=filename,
-    )
+    if not report["transactions"]:
+        with _email_report_cooldown_lock:
+            _email_report_cooldowns.pop(user_id, None)
+        flash(f"No transactions found for {report['period_label']}.", "info")
+        return redirect(url_for("reports", report_type=report_type, month=selected_month, year=selected_year))
+
+    if send_report_email(user_profile, report_type, report["period_label"], report["csv_content"], report["summary"]):
+        flash(f"{report_type.title()} report for {report['period_label']} was emailed to {user_profile['email']}.", "success")
+    else:
+        with _email_report_cooldown_lock:
+            _email_report_cooldowns.pop(user_id, None)
+        flash("Unable to send report email right now. Please verify SMTP settings and try again.", "danger")
+
+    return redirect(url_for("reports", report_type=report_type, month=selected_month, year=selected_year))
 
 
 @app.route("/reports/monthly/email", methods=["POST"])
 @login_required
 def email_monthly_report():
-    user_id = int(session["user_id"])
-    selected_month = resolve_report_month(request.form.get("month"))
-    user_profile = fetch_user_profile(user_id)
-
-    if user_profile is None or not user_profile.get("email"):
-        flash("No email address found for your account.", "danger")
-        return redirect(url_for("reports", month=selected_month))
-
-    if not _is_email_configured():
-        flash("Monthly report email is disabled. Configure SMARTFIN_SMTP_* and SMARTFIN_EMAIL_FROM to enable it.", "info")
-        return redirect(url_for("reports", month=selected_month))
-
-    can_send, remaining_seconds = can_send_monthly_report_email(user_id)
-    if not can_send:
-        flash(f"Please wait {remaining_seconds} seconds before sending another monthly report email.", "warning")
-        return redirect(url_for("reports", month=selected_month))
-
-    transactions = fetch_user_transactions(user_id)
-    monthly_transactions = filter_transactions_by_month(transactions, selected_month)
-    monthly_summary = calculate_summary(monthly_transactions)
-    suggestions = generate_financial_suggestions(monthly_transactions)
-    report_csv = build_monthly_report_csv(
-        user_name=user_profile.get("name", "User"),
-        month=selected_month,
-        summary=monthly_summary,
-        transactions=monthly_transactions,
-        suggestions=suggestions,
-    )
-
-    if send_monthly_report_email(user_profile, selected_month, report_csv, monthly_summary):
-        flash(f"Monthly report for {selected_month} was emailed to {user_profile['email']}.", "success")
-    else:
-        with _email_report_cooldown_lock:
-            _email_report_cooldowns.pop(user_id, None)
-        flash("Unable to send monthly report email right now. Please verify SMTP settings and try again.", "danger")
-
-    return redirect(url_for("reports", month=selected_month))
+    return send_email_report()
 
 
 @app.route("/budgets", methods=["GET", "POST"])
@@ -792,6 +997,17 @@ def budgets():
 def chart_data():
     user_id = int(session["user_id"])
     transactions = fetch_user_transactions(user_id)
+    raw_report_type = request.args.get("report_type")
+    if raw_report_type:
+        report_type = resolve_report_type(raw_report_type)
+        if report_type == "yearly":
+            selected_year = resolve_report_year(request.args.get("year"))
+            scoped_transactions = filter_transactions_by_year(transactions, selected_year)
+        else:
+            selected_month = resolve_report_month(request.args.get("month"))
+            scoped_transactions = filter_transactions_by_month(transactions, selected_month)
+        return jsonify(build_chart_payload(scoped_transactions, user_id=user_id))
+
     return jsonify(build_chart_payload(transactions, user_id=user_id))
 
 
