@@ -306,15 +306,3 @@ $env:SMARTFIN_SMTP_PASSWORD = "your-app-password"
 $env:SMARTFIN_SMTP_USE_TLS = "true"
 $env:SMARTFIN_EMAIL_FROM = "your-email@example.com"
 ```
-
-## Author Notes
-
-This project is structured to be easy to explain during a viva:
-
-- Separate modules for database, ML, and analytics
-- Clear route-based Flask application design
-- Readable templates and styling
-- Straightforward rule-based financial suggestions
-- Explainable models suitable for academic presentation
-
-
