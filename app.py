@@ -151,6 +151,48 @@ def resolve_report_type(raw_report_type: str | None) -> str:
     return "yearly" if report_type == "yearly" else "monthly"
 
 
+def resolve_compare_range(raw_compare_range: str | None) -> str:
+    """Return a supported comparison range for income vs expense charts."""
+    compare_range = (raw_compare_range or "last_3_months").strip().lower()
+    return "last_month" if compare_range == "last_month" else "last_3_months"
+
+
+def filter_transactions_by_recent_months(transactions: list[dict], months_count: int) -> list[dict]:
+    """Return transactions limited to the most recent N months found in data."""
+    if months_count <= 0:
+        return []
+
+    parsed_rows: list[tuple[dict, datetime]] = []
+    for item in transactions:
+        try:
+            parsed_date = datetime.strptime(str(item.get("date", "")), "%Y-%m-%d")
+        except ValueError:
+            continue
+        parsed_rows.append((item, parsed_date))
+
+    if not parsed_rows:
+        return []
+
+    latest_date = max(date_value for _, date_value in parsed_rows)
+    latest_month_start = latest_date.replace(day=1)
+    allowed_periods: set[str] = set()
+    cursor_year = latest_month_start.year
+    cursor_month = latest_month_start.month
+
+    for _ in range(months_count):
+        allowed_periods.add(f"{cursor_year:04d}-{cursor_month:02d}")
+        cursor_month -= 1
+        if cursor_month == 0:
+            cursor_month = 12
+            cursor_year -= 1
+
+    return [
+        item
+        for item, parsed_date in parsed_rows
+        if parsed_date.strftime("%Y-%m") in allowed_periods
+    ]
+
+
 def available_report_years(transactions: list[dict]) -> list[str]:
     """Return available years from transactions plus current year, newest first."""
     years = {datetime.today().strftime("%Y")}
@@ -806,6 +848,7 @@ def delete_transaction(transaction_id: int):
 def reports():
     user_id = int(session["user_id"])
     report_type = resolve_report_type(request.args.get("report_type"))
+    compare_range = resolve_compare_range(request.args.get("compare_range"))
     selected_month = resolve_report_month(request.args.get("month"))
     selected_year = resolve_report_year(request.args.get("year"))
     transactions = fetch_user_transactions(user_id)
@@ -850,6 +893,7 @@ def reports():
         selected_period_label=report["period_label"],
         available_years=available_report_years(transactions),
         current_year=datetime.today().year,
+        compare_range=compare_range,
         monthly_summary=report["summary"],
         monthly_transaction_count=len(report["transactions"]),
         category_breakdown=report["category_breakdown"],
@@ -869,6 +913,7 @@ def export_report():
     report_type = resolve_report_type(request.args.get("report_type"))
     selected_month = resolve_report_month(request.args.get("month"))
     selected_year = resolve_report_year(request.args.get("year"))
+    compare_range = resolve_compare_range(request.args.get("compare_range"))
 
     transactions = fetch_user_transactions(user_id)
     report = generate_report(
@@ -881,7 +926,15 @@ def export_report():
 
     if not report["transactions"]:
         flash(f"No transactions found for {report['period_label']}.", "info")
-        return redirect(url_for("reports", report_type=report_type, month=selected_month, year=selected_year))
+        return redirect(
+            url_for(
+                "reports",
+                report_type=report_type,
+                month=selected_month,
+                year=selected_year,
+                compare_range=compare_range,
+            )
+        )
 
     return send_file(
         BytesIO(report["csv_content"].encode("utf-8")),
@@ -905,20 +958,45 @@ def send_email_report():
     report_type = resolve_report_type(request.form.get("report_type"))
     selected_month = resolve_report_month(request.form.get("month"))
     selected_year = resolve_report_year(request.form.get("year"))
+    compare_range = resolve_compare_range(request.form.get("compare_range"))
     user_profile = fetch_user_profile(user_id)
 
     if user_profile is None or not user_profile.get("email"):
         flash("No email address found for your account.", "danger")
-        return redirect(url_for("reports", report_type=report_type, month=selected_month, year=selected_year))
+        return redirect(
+            url_for(
+                "reports",
+                report_type=report_type,
+                month=selected_month,
+                year=selected_year,
+                compare_range=compare_range,
+            )
+        )
 
     if not _is_email_configured():
         flash("Report email is disabled. Configure SMARTFIN_SMTP_* and SMARTFIN_EMAIL_FROM to enable it.", "info")
-        return redirect(url_for("reports", report_type=report_type, month=selected_month, year=selected_year))
+        return redirect(
+            url_for(
+                "reports",
+                report_type=report_type,
+                month=selected_month,
+                year=selected_year,
+                compare_range=compare_range,
+            )
+        )
 
     can_send, remaining_seconds = can_send_report_email(user_id)
     if not can_send:
         flash(f"Please wait {remaining_seconds} seconds before sending another report email.", "warning")
-        return redirect(url_for("reports", report_type=report_type, month=selected_month, year=selected_year))
+        return redirect(
+            url_for(
+                "reports",
+                report_type=report_type,
+                month=selected_month,
+                year=selected_year,
+                compare_range=compare_range,
+            )
+        )
 
     transactions = fetch_user_transactions(user_id)
     report = generate_report(
@@ -933,7 +1011,15 @@ def send_email_report():
         with _email_report_cooldown_lock:
             _email_report_cooldowns.pop(user_id, None)
         flash(f"No transactions found for {report['period_label']}.", "info")
-        return redirect(url_for("reports", report_type=report_type, month=selected_month, year=selected_year))
+        return redirect(
+            url_for(
+                "reports",
+                report_type=report_type,
+                month=selected_month,
+                year=selected_year,
+                compare_range=compare_range,
+            )
+        )
 
     if send_report_email(user_profile, report_type, report["period_label"], report["csv_content"], report["summary"]):
         flash(f"{report_type.title()} report for {report['period_label']} was emailed to {user_profile['email']}.", "success")
@@ -942,7 +1028,15 @@ def send_email_report():
             _email_report_cooldowns.pop(user_id, None)
         flash("Unable to send report email right now. Please verify SMTP settings and try again.", "danger")
 
-    return redirect(url_for("reports", report_type=report_type, month=selected_month, year=selected_year))
+    return redirect(
+        url_for(
+            "reports",
+            report_type=report_type,
+            month=selected_month,
+            year=selected_year,
+            compare_range=compare_range,
+        )
+    )
 
 
 @app.route("/reports/monthly/email", methods=["POST"])
@@ -997,6 +1091,7 @@ def budgets():
 def chart_data():
     user_id = int(session["user_id"])
     transactions = fetch_user_transactions(user_id)
+    compare_range = resolve_compare_range(request.args.get("compare_range"))
     raw_report_type = request.args.get("report_type")
     if raw_report_type:
         report_type = resolve_report_type(raw_report_type)
@@ -1006,9 +1101,31 @@ def chart_data():
         else:
             selected_month = resolve_report_month(request.args.get("month"))
             scoped_transactions = filter_transactions_by_month(transactions, selected_month)
-        return jsonify(build_chart_payload(scoped_transactions, user_id=user_id))
 
-    return jsonify(build_chart_payload(transactions, user_id=user_id))
+        if compare_range == "last_month":
+            comparison_transactions = filter_transactions_by_recent_months(transactions, 1)
+        else:
+            comparison_transactions = filter_transactions_by_recent_months(transactions, 3)
+        return jsonify(
+            build_chart_payload(
+                scoped_transactions,
+                user_id=user_id,
+                comparison_transactions=comparison_transactions,
+            )
+        )
+
+    if compare_range == "last_month":
+        comparison_transactions = filter_transactions_by_recent_months(transactions, 1)
+    else:
+        comparison_transactions = filter_transactions_by_recent_months(transactions, 3)
+
+    return jsonify(
+        build_chart_payload(
+            transactions,
+            user_id=user_id,
+            comparison_transactions=comparison_transactions,
+        )
+    )
 
 
 @app.route("/api/transactions")

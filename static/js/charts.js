@@ -21,6 +21,7 @@ async function loadChartData() {
             const reportType = reportContext.dataset.reportType || '';
             const month = reportContext.dataset.month || '';
             const year = reportContext.dataset.year || '';
+            const compareRange = reportContext.dataset.compareRange || '';
 
             if (reportType) {
                 params.set('report_type', reportType);
@@ -30,6 +31,9 @@ async function loadChartData() {
             }
             if (year) {
                 params.set('year', year);
+            }
+            if (compareRange) {
+                params.set('compare_range', compareRange);
             }
 
             if (params.toString()) {
@@ -126,6 +130,12 @@ function renderSavingsExpenseChart(monthlyFinancials) {
         return;
     }
 
+    const reportContext = document.getElementById('reportChartContext');
+    const compareRange = reportContext ? (reportContext.dataset.compareRange || 'last_3_months') : 'last_3_months';
+    const incomeLabel = compareRange === 'last_month' ? 'Income (Last Month)' : 'Income (Last 3 Months)';
+    const expenseLabel = compareRange === 'last_month' ? 'Expenses (Last Month)' : 'Expenses (Last 3 Months)';
+    const savingsLabel = compareRange === 'last_month' ? 'Savings (Last Month)' : 'Savings (Last 3 Months)';
+
     destroyChart(savingsExpenseChart);
     savingsExpenseChart = new Chart(canvas, {
         type: 'bar',
@@ -133,19 +143,19 @@ function renderSavingsExpenseChart(monthlyFinancials) {
             labels: monthlyFinancials.map((item) => item.month),
             datasets: [
                 {
-                    label: 'Income',
+                    label: incomeLabel,
                     data: monthlyFinancials.map((item) => item.income),
                     backgroundColor: '#1e9f70',
                     borderRadius: 8,
                 },
                 {
-                    label: 'Expenses',
+                    label: expenseLabel,
                     data: monthlyFinancials.map((item) => item.expense),
                     backgroundColor: '#d05454',
                     borderRadius: 8,
                 },
                 {
-                    label: 'Savings',
+                    label: savingsLabel,
                     data: monthlyFinancials.map((item) => item.savings),
                     backgroundColor: '#0c8a9e',
                     borderRadius: 8,

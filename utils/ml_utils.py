@@ -162,7 +162,11 @@ def generate_financial_suggestions(transactions: list[dict]) -> list[str]:
     return suggestions
 
 
-def build_chart_payload(transactions: list[dict], user_id: int | None = None) -> dict:
+def build_chart_payload(
+    transactions: list[dict],
+    user_id: int | None = None,
+    comparison_transactions: list[dict] | None = None,
+) -> dict:
     patterns = analyze_spending_patterns(transactions)
     summary = calculate_summary(transactions)
     if user_id is not None:
@@ -173,7 +177,8 @@ def build_chart_payload(transactions: list[dict], user_id: int | None = None) ->
             "predicted_expense": 0.0,
             "status": "insufficient-data",
         }
-    frame = _build_frame(transactions)
+    base_transactions = comparison_transactions if comparison_transactions is not None else transactions
+    frame = _build_frame(base_transactions)
 
     savings_by_month: dict[str, dict[str, float]] = defaultdict(lambda: {"income": 0.0, "expense": 0.0})
     if not frame.empty:

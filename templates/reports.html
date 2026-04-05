@@ -36,6 +36,14 @@
                 <input type="number" name="year" id="reportYearInput" value="{{ selected_year }}" min="2000" max="{{ current_year + 5 }}" step="1" {% if report_type != 'yearly' %}disabled{% endif %}>
             </label>
 
+            <label>
+                Compare Income vs Expense
+                <select name="compare_range" id="compareRangeSelect" required>
+                    <option value="last_3_months" {% if compare_range == 'last_3_months' %}selected{% endif %}>Last 3 Months</option>
+                    <option value="last_month" {% if compare_range == 'last_month' %}selected{% endif %}>Last Month</option>
+                </select>
+            </label>
+
             <button type="submit" class="secondary-btn">Load Report</button>
         </form>
 
@@ -52,6 +60,7 @@
             <input type="hidden" name="report_type" value="{{ report_type }}" id="emailReportTypeInput">
             <input type="hidden" name="month" value="{{ selected_month }}" id="emailReportMonthInput">
             <input type="hidden" name="year" value="{{ selected_year }}" id="emailReportYearInput">
+            <input type="hidden" name="compare_range" value="{{ compare_range }}" id="emailCompareRangeInput">
             <button type="submit" class="secondary-btn" id="emailBtn" data-cooldown-ms="10000">Email {{ report_type.title() }} Report</button>
             <span id="emailCooldownMessage" class="inline-cooldown-message" aria-live="polite"></span>
         </form>
@@ -160,7 +169,7 @@
 {% endif %}
 
 <section class="dashboard-grid">
-    <div id="reportChartContext" data-report-type="{{ report_type }}" data-month="{{ selected_month }}" data-year="{{ selected_year }}" hidden></div>
+    <div id="reportChartContext" data-report-type="{{ report_type }}" data-month="{{ selected_month }}" data-year="{{ selected_year }}" data-compare-range="{{ compare_range }}" hidden></div>
 
     <article class="panel chart-panel">
         <div class="panel-heading">
@@ -255,17 +264,20 @@ document.addEventListener('DOMContentLoaded', function () {
     const reportYearField = document.getElementById('reportYearField');
     const reportMonthInput = document.getElementById('reportMonthInput');
     const reportYearInput = document.getElementById('reportYearInput');
+    const compareRangeSelect = document.getElementById('compareRangeSelect');
     const exportReportLink = document.getElementById('exportReportLink');
     const emailReportTypeInput = document.getElementById('emailReportTypeInput');
     const emailReportMonthInput = document.getElementById('emailReportMonthInput');
     const emailReportYearInput = document.getElementById('emailReportYearInput');
+    const emailCompareRangeInput = document.getElementById('emailCompareRangeInput');
     const emailButton = document.getElementById('emailBtn');
 
     function getState() {
         const reportType = reportTypeSelect ? reportTypeSelect.value : 'monthly';
         const month = reportMonthInput && reportMonthInput.value ? reportMonthInput.value : '{{ selected_month }}';
         const year = reportYearInput && reportYearInput.value ? reportYearInput.value : '{{ selected_year }}';
-        return { reportType, month, year };
+        const compareRange = compareRangeSelect ? compareRangeSelect.value : '{{ compare_range }}';
+        return { reportType, month, year, compareRange };
     }
 
     function syncActionTargets() {
@@ -280,6 +292,9 @@ document.addEventListener('DOMContentLoaded', function () {
         if (emailReportYearInput) {
             emailReportYearInput.value = state.year;
         }
+        if (emailCompareRangeInput) {
+            emailCompareRangeInput.value = state.compareRange;
+        }
 
         if (exportReportLink) {
             const baseUrl = exportReportLink.dataset.baseUrl || exportReportLink.getAttribute('href');
@@ -287,6 +302,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 report_type: state.reportType,
                 month: state.month,
                 year: state.year,
+                compare_range: state.compareRange,
             });
             exportReportLink.setAttribute('href', baseUrl + '?' + params.toString());
             exportReportLink.textContent = 'Download ' + state.reportType.charAt(0).toUpperCase() + state.reportType.slice(1) + ' CSV';
@@ -316,6 +332,10 @@ document.addEventListener('DOMContentLoaded', function () {
 
     if (reportTypeSelect) {
         reportTypeSelect.addEventListener('change', applyReportTypeVisibility);
+    }
+
+    if (compareRangeSelect) {
+        compareRangeSelect.addEventListener('change', syncActionTargets);
     }
 
     if (reportMonthInput) {
